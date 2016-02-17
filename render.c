@@ -159,26 +159,26 @@ int init()
     CHECK_RES(create_shader("vertex.glsl", "fragment.glsl", &base_shader));
 
 
-    int width, height;
-    unsigned char* image = SOIL_load_image("cake.png", &width, &height, 0, SOIL_LOAD_RGB);
-    assert(image);
-    glGenTextures(1, &texture1);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture1);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
-    glGenerateMipmap(GL_TEXTURE_2D);
-    SOIL_free_image_data(image);
+    /* int width, height; */
+    /* unsigned char* image = SOIL_load_image("cake.png", &width, &height, 0, SOIL_LOAD_RGB); */
+    /* assert(image); */
+    /* glGenTextures(1, &texture1); */
+    /* glActiveTexture(GL_TEXTURE0); */
+    /* glBindTexture(GL_TEXTURE_2D, texture1); */
+    /* glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image); */
+    /* glGenerateMipmap(GL_TEXTURE_2D); */
+    /* SOIL_free_image_data(image); */
 
-    image = SOIL_load_image("bee.png", &width, &height, 0, SOIL_LOAD_RGB);
-    assert(image);
-    glGenTextures(1, &texture2);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, texture2);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
-    glGenerateMipmap(GL_TEXTURE_2D);
-    SOIL_free_image_data(image);
+    /* image = SOIL_load_image("bee.png", &width, &height, 0, SOIL_LOAD_RGB); */
+    /* assert(image); */
+    /* glGenTextures(1, &texture2); */
+    /* glActiveTexture(GL_TEXTURE1); */
+    /* glBindTexture(GL_TEXTURE_2D, texture2); */
+    /* glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image); */
+    /* glGenerateMipmap(GL_TEXTURE_2D); */
+    /* SOIL_free_image_data(image); */
 
-    glBindTexture(GL_TEXTURE_2D, 0);
+    /* glBindTexture(GL_TEXTURE_2D, 0); */
 
 
     glGenBuffers(MAX_OBJECTS, VBOs);
