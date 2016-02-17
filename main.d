@@ -25,7 +25,7 @@ Vec3 camera_pos = Vec3(0, 0, 3);
 // Vec3 camera_up = Vec3(0, 1, 0);
 float fov = deg_to_rad(45);
 
-Vec4 char_pos = Vec4(0, 0.7, 0, 0.5);
+Vec4 char_pos = Vec4(0, 0.4, 0, 0.5);
 Vec4 char_front = Vec4(0, 0, 1, 0);
 Vec4 char_up = Vec4(0, 1, 0, 0);
 Vec4 char_normal = Vec4(0, 0, 0, 1);
@@ -61,9 +61,11 @@ void main()
     world.scene ~= tesseract(Vec4(0, 0, 4, -1));
     world.scene ~= tesseract(Vec4(0, 1, 4, 0));
     world.scene ~= fivecell(Vec4(4, 2, 4, 0));
-    world.scene ~= tesseract(Vec4(4, 0, -4, -5), Vec4(0.2, 1.5, 4, 10));
-    world.scene ~= tesseract(Vec4(6, 0, -4, -5), Vec4(0.2, 1.5, 4, 10));
-    world.scene ~= tesseract(Vec4(4, 1.5, -4, -5), Vec4(2.2, 0.2, 4, 10));
+    world.scene ~= tesseract(Vec4(4, 0, -4, 0), Vec4(0.2, 1.5, 3, 1));
+    world.scene ~= tesseract(Vec4(5.6, 0, -4, 0), Vec4(0.2, 1.5, 3, 1));
+    world.scene ~= tesseract(Vec4(4.2, 0, -4, 0), Vec4(1.4, 1.5, 0.2, 1));
+    world.scene ~= tesseract(Vec4(4.2, 0, -1.2, 0), Vec4(1.4, 1.5, 0.2, 1));
+    world.scene ~= tesseract(Vec4(4, 1.5, -4, 0), Vec4(1.8, 0.2, 3, 1));
     //scene ~= tesseract(Vec4(1, 0, 0, 0));
     //scene ~= tesseract(Vec4(0, 1, 0, 0));
     //scene ~= tesseract(Vec4(1, 1, 0, 0));
@@ -121,7 +123,7 @@ void main()
             flat_front.x, flat_front.y, flat_front.z, flat_front.w,
             flat_normal.x, flat_normal.y, flat_normal.z, flat_normal.w,
             );
-        world.character = tesseract!true(char_pos, 0.1 * Vec4(1, 1, 1, 1), r);
+        world.character = tesseract!true(char_pos, 0.6 * Vec4(0.3, 0.8, 0.3, 0.3), r);
 
         cross_section(world, objects, object_count);
 
@@ -232,11 +234,11 @@ void process_input()
 
     if (get_key(GLFWKey.GLFW_KEY_W) == GLFWKeyStatus.GLFW_PRESS)
     {
-        char_pos -= speed * (char_front - proj(char_front, global_up));
+        char_pos -= speed * (char_front - proj(char_front, global_up)).normalized();
     }
     if (get_key(GLFWKey.GLFW_KEY_S) == GLFWKeyStatus.GLFW_PRESS)
     {
-        char_pos += speed * (char_front - proj(char_front, global_up));
+        char_pos += speed * (char_front - proj(char_front, global_up)).normalized();
     }
     if (get_key(GLFWKey.GLFW_KEY_R) == GLFWKeyStatus.GLFW_PRESS)
     {
@@ -405,6 +407,8 @@ void process_input()
         char_front = Vec4(0, 0, 1, 0);
         char_up = Vec4(0, 1, 0, 0);
         char_normal = Vec4(0, 0, 0, 1);
+        camera_pos.z = 3;
+        view_mat = look_at(camera_pos, Vec3(0, 0, 0), Vec3(0, 1, 0));
     }
     if (get_key(GLFWKey.GLFW_KEY_2) == GLFWKeyStatus.GLFW_PRESS)
     {
