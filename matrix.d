@@ -690,19 +690,20 @@ Mat4 rot(bool this_plane = true)(auto ref in Vec4 basis1, auto ref in Vec4 basis
                 e[0].w * e[1].x - e[0].x * e[1].w,
                 0
                 );
-            assert(abs(e[2].magnitude()) > 1e-6, format("\n%s\n%s\n%s\n%s", e[0], e[1],
-                                                        Vec4(
-                                                            e[0].y * e[1].z - e[0].z * e[1].y,
-                                                            e[0].z * e[1].x - e[0].x * e[1].z,
-                                                            e[0].x * e[1].y - e[0].y * e[1].x,
-                                                            0
-                                                            ),
-                                                        Vec4(
-                                                            e[0].y * e[1].z - e[0].z * e[1].y,
-                                                            e[0].z * e[1].w - e[0].w * e[1].z,
-                                                            e[0].w * e[1].y - e[0].y * e[1].w,
-                                                            0
-                                                            ), e[2]));
+            assert(abs(e[2].magnitude()) > 1e-6,
+                   format("\n%s\n%s\n%s\n%s", e[0], e[1],
+                          Vec4(
+                              e[0].y * e[1].z - e[0].z * e[1].y,
+                              e[0].z * e[1].x - e[0].x * e[1].z,
+                              e[0].x * e[1].y - e[0].y * e[1].x,
+                              0
+                              ),
+                          Vec4(
+                              e[0].y * e[1].z - e[0].z * e[1].y,
+                              e[0].z * e[1].w - e[0].w * e[1].z,
+                              e[0].w * e[1].y - e[0].y * e[1].w,
+                              0
+                              ), e[2]));
         }
     }
     e[2].normalize();

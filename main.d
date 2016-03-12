@@ -31,7 +31,7 @@ Vec4 char_up = Vec4(0, 1, 0, 0);
 Vec4 char_normal = Vec4(0, 0, 0, 1);
 enum Vec4 global_up = Vec4(0, 1, 0, 0);
 
-Mat4 view_mat, projection_mat;
+Mat4 view_mat, projection_mat, compass_projection_mat;
 Mat4[MAX_OBJECTS] model_mats;
 
 
@@ -43,6 +43,10 @@ void main()
 
     width = 1280;
     height = 800;
+
+
+    Vec3 compass_base_ = Vec3(0, 0, 0);
+    compass_base = compass_base_.data();
 
 
     World world;
@@ -86,6 +90,8 @@ void main()
     view = view_mat.data;
     projection = projection_mat.data;
 
+    compass_projection = compass_projection_mat.data;
+
     models = array(map!((ref a) => a.data)(model_mats[]));
 
     handle_errors!init();
@@ -108,10 +114,13 @@ void main()
         if (last_width != width || last_height != height || last_fov != fov)
         {
             projection_mat = perspective(fov, cast(float)(width) / height, 0.1, 100);
+            compass_projection_mat = perspective(deg_to_rad(45), width, 0.1, 100);
             //projection_mat = orthographic(-width / 400.0, width / 400.0, -height / 400.0, height / 400.0, -10, 100);
             last_height = height;
             last_width = width;
             last_fov = fov;
+
+            window_size_update();
         }
 
         Vec4 flat_front = (char_front - proj(char_front, global_up)).normalized();
@@ -124,6 +133,9 @@ void main()
             flat_normal.x, flat_normal.y, flat_normal.z, flat_normal.w,
             );
         world.character = tesseract!true(char_pos, 0.6 * Vec4(0.3, 0.8, 0.3, 0.3), r);
+
+        Vec3 compass_ = Vec3(-flat_front.x, flat_front.w, flat_front.z) + compass_base_;
+        compass = compass_.data();
 
         cross_section(world, objects, object_count);
 
@@ -416,6 +428,12 @@ void process_input()
         char_front = Vec4(-.01, 0, 1, 0).normalized();
         char_up = Vec4(0, 1, 0, 0);
         char_normal = Vec4(0, 0, 0, 1);
+    }
+    if (get_key(GLFWKey.GLFW_KEY_3) == GLFWKeyStatus.GLFW_PRESS)
+    {
+        char_front = Vec4(0, 0, 1, 0);
+        char_up = Vec4(0, 0, 0, 1);
+        char_normal = Vec4(0, 1, 0, 0);
     }
 
 
