@@ -11,7 +11,7 @@ Still figuring this bit out!  I'll put instructions here once I do it, I swear.
 ## Controls
 (Subject to change!)
 
-Hold left shift to go faster or control shift to go slower for any movement or rotation.
+Hold left shift to go faster or left control to go slower for any movement or rotation.
 
 * W - forwards
 * A - left

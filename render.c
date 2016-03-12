@@ -475,7 +475,8 @@ void render(void)
     glViewport(0, 0, width, height);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    glClearColor(1, 1, 1, 1);
+    glClearColor(0.3, 0.3, 0.3, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
     glUseProgram(fb_shader);
     glBindVertexArray(fb_rectangle_vao);
     glDisable(GL_DEPTH_TEST);
