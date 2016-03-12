@@ -28,21 +28,15 @@ typedef struct
     float *p;
 } FloatDArray;
 
+
+const float UNSPECF = 37.0;
+
+
 GLFWwindow *w;
 
 GLuint fb_shader;
 GLuint fb_rectangle_vbo;
 GLuint fb_rectangle_vao;
-
-float *compass_base;
-float *compass;
-float *compass_projection;
-GLuint compass_projection_location;
-GLuint compass_VBO;
-GLuint compass_VAO;
-GLuint compass_shader;
-GLuint compass_framebuffer;
-GLuint compass_tex;
 
 #define MAX_OBJECTS 1000
 GLuint VBOs[MAX_OBJECTS];
@@ -52,12 +46,32 @@ int object_count;
 //GLuint EBO;
 GLuint base_shader;
 GLuint texture1, texture2;
-GLuint view_loc, model_loc, projection_loc;
+GLuint view_loc, projection_loc;
+GLuint main_fb;
+GLuint main_tex;
+GLuint main_rbo;
+
+float *compass_base;
+float *compass;
+float *compass_projection;
+GLuint compass_projection_location;
+GLuint compass_VBO;
+GLuint compass_VAO;
+GLuint compass_shader;
+GLuint compass_fb;
+GLuint compass_tex;
+
+GLuint vertical_VBOs[MAX_OBJECTS];
+GLuint vertical_VAOs[MAX_OBJECTS];
+FloatDArray vertical_objects[MAX_OBJECTS];
+int vertical_object_count;
+GLuint vertical_fb;
+GLuint vertical_tex;
+GLuint vertical_rbo;
 
 int width, height;
 const char *title;
 float *view, *projection;
-float *models[MAX_OBJECTS];
 
 
 
@@ -76,6 +90,7 @@ void cleanup(void)
 static void error_callback(int error, const char *description)
 {
     fputs(description, stderr);
+    error++; // silence warning
 }
 
 static int create_shader(GLuint *shader_program, const char *vs_filename,
@@ -208,6 +223,10 @@ int init()
     CHECK_RES(create_shader(&compass_shader, "compass_vertex.glsl", NULL,"compass_fragment.glsl"));
     CHECK_RES(create_shader(&fb_shader, "fb_vertex.glsl", "fb_geometry.glsl", "fb_fragment.glsl"));
 
+    view_loc = glGetUniformLocation(base_shader, "view");
+    projection_loc = glGetUniformLocation(base_shader, "projection");
+    compass_projection_location = glGetUniformLocation(compass_shader, "projection");
+
 
     /* int width, height; */
     /* unsigned char* image = SOIL_load_image("cake.png", &width, &height, 0, SOIL_LOAD_RGB); */
@@ -231,17 +250,8 @@ int init()
     /* glBindTexture(GL_TEXTURE_2D, 0); */
 
 
-    glGenBuffers(1, &fb_rectangle_vbo);
-    glGenVertexArrays(1, &fb_rectangle_vao);
-    glBindVertexArray(fb_rectangle_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, fb_rectangle_vbo);
-    float vs[4 * 2] = {
-        -1,  -1,   1, 1,       // main area
-        0.5, -1, 1, -0.5,      // compass
-    };
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vs), vs, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (GLvoid*)0);
-    glEnableVertexAttribArray(0);
+    glGenBuffers(MAX_OBJECTS, VBOs);
+    glGenVertexArrays(MAX_OBJECTS, VAOs);
 
 
     glGenBuffers(1, &compass_VBO);
@@ -250,60 +260,63 @@ int init()
     glBindBuffer(GL_ARRAY_BUFFER, compass_VBO);
     glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(float), NULL, GL_STREAM_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
-    compass_projection_location = glGetUniformLocation(compass_shader, "projection");
     glEnableVertexAttribArray(0);
 
 
-    glGenBuffers(MAX_OBJECTS, VBOs);
-    //glGenBuffers(1, &EBO);
-    glGenVertexArrays(MAX_OBJECTS, VAOs);
-
-    for (int i = 0; i < MAX_OBJECTS; i++)
-    {
-        glBindVertexArray(VAOs[i]);
-
-        //glBindBuffer(GL_ARRAY_BUFFER, VBOs[i]);
-        //glBufferData(GL_ARRAY_BUFFER, object_lens[i] * 36 * sizeof(objects[0]), objects[i], GL_DYNAMIC_DRAW);
-
-        //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-        //glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-        // position
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)0);
-        glEnableVertexAttribArray(0);
-        // color
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
-        glEnableVertexAttribArray(1);
-        // texture
-        //glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
-        //glEnableVertexAttribArray(2);
-    }
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-
-    model_loc = glGetUniformLocation(base_shader, "model");
-    view_loc = glGetUniformLocation(base_shader, "view");
-    projection_loc = glGetUniformLocation(base_shader, "projection");
+    glGenBuffers(MAX_OBJECTS, vertical_VBOs);
+    glGenVertexArrays(MAX_OBJECTS, vertical_VAOs);
 
 
-    glGenFramebuffers(1, &compass_framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, compass_framebuffer);
+    glGenBuffers(1, &fb_rectangle_vbo);
+    glGenVertexArrays(1, &fb_rectangle_vao);
+    glBindVertexArray(fb_rectangle_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, fb_rectangle_vbo);
+    float vs[4 * 3] = {
+        -1,      -1, 1.0 / 3, 1.0 / 3, // main area
+        UNSPECF, -1, 1,       UNSPECF, // compass
+        0,       0,  1,       1, // vertical view
+    };
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vs), vs, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (GLvoid*)0);
+    glEnableVertexAttribArray(0);
+
+
+    glGenFramebuffers(1, &main_fb);
+    glBindFramebuffer(GL_FRAMEBUFFER, main_fb);
+    glGenTextures(1, &main_tex);
+    glBindTexture(GL_TEXTURE_2D, main_tex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, main_tex, 0);
+    glGenRenderbuffers(1, &main_rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, main_rbo);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, main_rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glGenFramebuffers(1, &compass_fb);
+    glBindFramebuffer(GL_FRAMEBUFFER, compass_fb);
     glGenTextures(1, &compass_tex);
     glBindTexture(GL_TEXTURE_2D, compass_tex);
-    float cw = width / 30;
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, cw, cw, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, compass_tex, 0);
-    /* GLuint compass_rbo; */
-    /* glGenRenderbuffers(1, &compass_rbo); */
-    /* glBindRenderbuffer(GL_RENDERBUFFER, compass_rbo); */
-    /* glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, cw, cw); */
-    /* glBindRenderbuffer(GL_RENDERBUFFER, 0); */
-    /* glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, compass_rbo); */
-    CHECK_RES(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glGenFramebuffers(1, &vertical_fb);
+    glBindFramebuffer(GL_FRAMEBUFFER, vertical_fb);
+    glGenTextures(1, &vertical_tex);
+    glBindTexture(GL_TEXTURE_2D, vertical_tex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, vertical_tex, 0);
+    glGenRenderbuffers(1, &vertical_rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, vertical_rbo);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, vertical_rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 
@@ -315,7 +328,7 @@ int init()
     return 0;
 }
 
-void window_size_update(void)
+int window_size_update(void)
 {
     //float mag = sqrt(width * width + height * height);
 
@@ -329,22 +342,43 @@ void window_size_update(void)
     glUniformMatrix4fv(projection_loc, 1, GL_FALSE, projection);
 
 
+    glBindFramebuffer(GL_FRAMEBUFFER, main_fb);
+    glBindTexture(GL_TEXTURE_2D, main_tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width * 2 / 3, height * 2 / 3, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glBindRenderbuffer(GL_RENDERBUFFER, main_rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
+    CHECK_RES(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE);
+
+
+    glBindFramebuffer(GL_FRAMEBUFFER, compass_fb);
     glBindTexture(GL_TEXTURE_2D, compass_tex);
     float cw = fmax(width, height) / 2.0;
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, cw, cw, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
+    CHECK_RES(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE);
+
+
+    glBindFramebuffer(GL_FRAMEBUFFER, vertical_fb);
+    glBindTexture(GL_TEXTURE_2D, vertical_tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width / 2, height / 2, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glBindRenderbuffer(GL_RENDERBUFFER, vertical_rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    CHECK_RES(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 
     glBindBuffer(GL_ARRAY_BUFFER, fb_rectangle_vbo);
     GLfloat *m = glMapBuffer(GL_ARRAY_BUFFER, GL_READ_WRITE);
     float ratio = width / (float) height;
-    m[4] = 1 - 0.5 / (ratio > 1 ? ratio : 1);
+    m[4] = 1 - 1 / (ratio > 1 ? ratio : 1);
     //m[5] = -1;
     //m[6] = 1;
-    m[7] = -1 + 0.5 * (ratio < 1 ? ratio : 1);
+    m[7] = -1 + 1 * (ratio < 1 ? ratio : 1);
     assert(glUnmapBuffer(GL_ARRAY_BUFFER));
+
+    return 0;
 }
 
 void render(void)
@@ -357,7 +391,7 @@ void render(void)
     float cw = fmax(width, height) / 2.0;
     glViewport(0, 0, cw, cw);
 
-    glBindFramebuffer(GL_FRAMEBUFFER, compass_framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, compass_fb);
     glClearColor(0, 0, 0.8, 1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     //glEnable(GL_DEPTH_TEST);
@@ -389,25 +423,14 @@ void render(void)
     glDrawArrays(GL_LINES, 0, 2);
 
 
-    glViewport(0, 0, width, height);
+    glViewport(0, 0, width * 2 / 3, height * 2 / 3);
 
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, main_fb);
     glClearColor(0.1f, ratio / 5, 0.1f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glUseProgram(base_shader);
     glEnable(GL_DEPTH_TEST);
-
-    /* GLint vertexColorLocation = glGetUniformLocation(base_shader, "foo"); */
-    /* assert(vertexColorLocation != -1); */
-    /* glUniform4f(vertexColorLocation, 1.0f, sin(glfwGetTime()) / 2.0f + 0.5f, 1.0f, 1.0f); */
-
-    /* glActiveTexture(GL_TEXTURE0); */
-    /* glBindTexture(GL_TEXTURE_2D, texture1); */
-    /* glUniform1i(glGetUniformLocation(base_shader, "tex1"), 0); */
-    /* glActiveTexture(GL_TEXTURE1); */
-    /* glBindTexture(GL_TEXTURE_2D, texture2); */
-    /* glUniform1i(glGetUniformLocation(base_shader, "tex2"), 1); */
 
     glUniformMatrix4fv(view_loc, 1, GL_FALSE, view);
 
@@ -422,19 +445,46 @@ void render(void)
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
         glEnableVertexAttribArray(1);
 
-        glUniformMatrix4fv(model_loc, 1, GL_FALSE, models[i]);
-
-        //glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-        //printf("%p\n", (void*)objects[i].p);
-        //printf("%zu\n", objects[i].l);
         glDrawArrays(GL_TRIANGLES, 0, objects[i].l / 6);
     }
 
+
+    glViewport(0, 0, width / 2, height / 2);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, vertical_fb);
+    glClearColor(1, 1, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glUniformMatrix4fv(view_loc, 1, GL_FALSE, view);
+
+    for (int i = 0; i < vertical_object_count; i++)
+    {
+        glBindVertexArray(vertical_VAOs[i]);
+
+        glBindBuffer(GL_ARRAY_BUFFER, vertical_VBOs[i]);
+        glBufferData(GL_ARRAY_BUFFER, vertical_objects[i].l * sizeof(float), vertical_objects[i].p, GL_STREAM_DRAW);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)0);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
+        glEnableVertexAttribArray(1);
+
+        glDrawArrays(GL_TRIANGLES, 0, vertical_objects[i].l / 6);
+    }
+
+
+    glViewport(0, 0, width, height);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glClearColor(1, 1, 1, 1);
     glUseProgram(fb_shader);
     glBindVertexArray(fb_rectangle_vao);
     glDisable(GL_DEPTH_TEST);
+    glBindTexture(GL_TEXTURE_2D, main_tex);
+    glDrawArrays(GL_POINTS, 0, 1);
     glBindTexture(GL_TEXTURE_2D, compass_tex);
     glDrawArrays(GL_POINTS, 1, 1);
+    glBindTexture(GL_TEXTURE_2D, vertical_tex);
+    glDrawArrays(GL_POINTS, 2, 1);
     glBindVertexArray(0);
 
 

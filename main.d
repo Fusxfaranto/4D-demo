@@ -32,7 +32,6 @@ Vec4 char_normal = Vec4(0, 0, 0, 1);
 enum Vec4 global_up = Vec4(0, 1, 0, 0);
 
 Mat4 view_mat, projection_mat, compass_projection_mat;
-Mat4[MAX_OBJECTS] model_mats;
 
 
 
@@ -92,8 +91,6 @@ void main()
 
     compass_projection = compass_projection_mat.data;
 
-    models = array(map!((ref a) => a.data)(model_mats[]));
-
     handle_errors!init();
     scope(exit) cleanup();
 
@@ -120,7 +117,7 @@ void main()
             last_width = width;
             last_fov = fov;
 
-            window_size_update();
+            handle_errors!window_size_update();
         }
 
         Vec4 flat_front = (char_front - proj(char_front, global_up)).normalized();
@@ -137,7 +134,11 @@ void main()
         Vec3 compass_ = Vec3(-flat_front.x, flat_front.w, flat_front.z) + compass_base_;
         compass = compass_.data();
 
-        cross_section(world, objects, object_count);
+        Vec4 char_right = cross_p(char_up, char_front, char_normal);
+        cross_section(world, objects, object_count,
+                      char_pos, char_up, char_front, char_normal, char_right);
+        cross_section(world, vertical_objects, vertical_object_count,
+                      char_pos, flat_normal, flat_front, global_up, flat_right);
 
         render();
 
@@ -159,12 +160,11 @@ void main()
 }
 
 
-void cross_section(ref in World world, out float[][MAX_OBJECTS] objects, out int object_count)
+void cross_section(ref in World world, out float[][MAX_OBJECTS] objects, out int object_count,
+                   Vec4 pos, Vec4 up, Vec4 front, Vec4 normal, Vec4 right)
 {
     // out param sets objects back to default
     assert(object_count == 0);  // juuuuuuust in case
-
-    Vec4 char_right = cross_p(char_up, char_front, char_normal);
 
     void run(ref in Vertex[4][] tets)
     {
@@ -174,8 +174,8 @@ void cross_section(ref in World world, out float[][MAX_OBJECTS] objects, out int
             bool[4] pos_side;
             for (int i = 0; i < 4; i++)
             {
-                rel_pos[i] = tet[i].loc - char_pos;
-                pos_side[i] = dot_p(rel_pos[i], char_normal) > 0;
+                rel_pos[i] = tet[i].loc - pos;
+                pos_side[i] = dot_p(rel_pos[i], normal) > 0;
             }
 
             int verts_added = 0;
@@ -186,11 +186,11 @@ void cross_section(ref in World world, out float[][MAX_OBJECTS] objects, out int
                     if (pos_side[i] != pos_side[j])
                     {
                         Vec4 diff = tet[i].loc - tet[j].loc;
-                        float d = dot_p(char_normal, diff);
+                        float d = dot_p(normal, diff);
                         // this would fire sometimes, but i don't think it's actually important to ensure
                         //assert(abs(d) > 1e-6);
                         Vec4 rel_intersection_point = tet[i].loc +
-                            diff * (-dot_p(rel_pos[i], char_normal) / d) - char_pos;
+                            diff * (-dot_p(rel_pos[i], normal) / d) - char_pos;
 
                         if (verts_added == 3)
                         {
@@ -201,9 +201,9 @@ void cross_section(ref in World world, out float[][MAX_OBJECTS] objects, out int
 
                         // http://stackoverflow.com/questions/23472048/projecting-3d-points-to-2d-plane i guess
                         objects[object_count] ~= [
-                            dot_p(char_right, rel_intersection_point),
-                            dot_p(char_up, rel_intersection_point),
-                            dot_p(char_front, rel_intersection_point),
+                            dot_p(right, rel_intersection_point),
+                            dot_p(up, rel_intersection_point),
+                            dot_p(front, rel_intersection_point),
                             tet[i].color_r, tet[i].color_b, tet[i].color_g
                             ];
                         verts_added++;
@@ -228,7 +228,7 @@ void process_input()
 
     float speed = 0.05;
     float rot_speed = 0.02;
-    float other_rot_speed = 0.006;
+    float other_rot_speed = rot_speed; // remove?
     float y_limit = 0.99;
 
     if (get_key(GLFWKey.GLFW_KEY_LEFT_SHIFT) == GLFWKeyStatus.GLFW_PRESS)

@@ -8,7 +8,7 @@ extern (C) int glfwGetKey(GLFWwindow* window, int key);
 extern (C) int glGetError();
 
 extern (C) void render();
-extern (C) void window_size_update();
+extern (C) int window_size_update();
 extern (C) void cleanup();
 extern (C) int init();
 
@@ -22,7 +22,8 @@ extern (C) extern __gshared float* compass_base;
 extern (C) extern __gshared float* compass;
 extern (C) extern __gshared float[][MAX_OBJECTS] objects;
 extern (C) extern __gshared int object_count;
-extern (C) extern __gshared float*[MAX_OBJECTS] models;
+extern (C) extern __gshared float[][MAX_OBJECTS] vertical_objects;
+extern (C) extern __gshared int vertical_object_count;
 extern (C) extern __gshared float* view;
 extern (C) extern __gshared float* projection;
 extern (C) extern __gshared float* compass_projection;
