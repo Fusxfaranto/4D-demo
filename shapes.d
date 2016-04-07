@@ -11,13 +11,28 @@ struct Vertex
 {
     Vec4 loc;
     float color_r;
-    float color_b;
     float color_g;
+    float color_b;
 }
 
 
-Vertex[4][] tesseract(bool centered = false)(Vec4 pos = Vec4(0, 0, 0, 0), Vec4 dim = Vec4(1, 1, 1, 1),
-                                             Mat4 transform = Mat4.init)
+void default_color_gen(ref Vertex v, int i)
+{
+    v.color_r /= (i % 7 + i / 5 + 1) / 2.0;
+    v.color_g /= (i % 5 + i / 3 + 1) / 5.0;
+    v.color_b /= (i % 3 + i / 7 + 1) / 3.0;
+}
+
+void solid_color_gen(float r, float g, float b)(ref Vertex v, int i)
+{
+    v.color_r = r * i / (5.0 * 8.0) * 0.7 + 0.15;
+    v.color_g = g * i / (5.0 * 8.0) * 0.7 + 0.15;
+    v.color_b = b * i / (5.0 * 8.0) * 0.7 + 0.15;
+}
+
+
+Vertex[4][] tesseract(bool centered = false, alias color_gen = default_color_gen)
+    (Vec4 pos = Vec4(0, 0, 0, 0), Vec4 dim = Vec4(1, 1, 1, 1), Mat4 transform = Mat4.init)
 {
     Vertex[4][] v =
         [
@@ -279,9 +294,7 @@ Vertex[4][] tesseract(bool centered = false)(Vec4 pos = Vec4(0, 0, 0, 0), Vec4 d
             {
                 vert.loc = transform * ewise_p(vert.loc, dim) + pos;
             }
-            vert.color_r /= (i % 7 + i / 5 + 1) / 2.0;
-            vert.color_b /= (i % 5 + i / 3 + 1) / 5.0;
-            vert.color_g /= (i % 3 + i / 7 + 1) / 3.0;
+            color_gen(vert, i);
             //writeln(vert);
         }
     }
@@ -332,8 +345,8 @@ Vertex[4][] fivecell(Vec4 pos = Vec4(0, 0, 0, 0), Mat4 transform = Mat4.init)
         {
             vert.loc = transform * vert.loc + pos;
             vert.color_r /= 2.0;
-            vert.color_b /= 2.0;
             vert.color_g /= 2.0;
+            vert.color_b /= 2.0;
             //writeln(vert);
         }
     }

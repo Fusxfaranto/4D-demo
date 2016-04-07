@@ -31,8 +31,16 @@ typedef struct
 
 const float UNSPECF = 37.0;
 
+enum
+{
+    DisplayMode__NORMAL = 0,
+    DisplayMode__SPLIT = 1,
+};
 
 GLFWwindow *w;
+int width, height;
+const char *title;
+int display_mode;
 
 GLuint fb_shader;
 GLuint fb_rectangle_vbo;
@@ -69,8 +77,6 @@ GLuint vertical_fb;
 GLuint vertical_tex;
 GLuint vertical_rbo;
 
-int width, height;
-const char *title;
 float *view, *projection;
 
 
@@ -269,16 +275,6 @@ int init()
 
     glGenBuffers(1, &fb_rectangle_vbo);
     glGenVertexArrays(1, &fb_rectangle_vao);
-    glBindVertexArray(fb_rectangle_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, fb_rectangle_vbo);
-    float vs[4 * 3] = {
-        -1,      -1, 1.0 / 3, 1.0 / 3, // main area
-        UNSPECF, -1, 1,       UNSPECF, // compass
-        0,       0,  1,       1, // vertical view
-    };
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vs), vs, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (GLvoid*)0);
-    glEnableVertexAttribArray(0);
 
 
     glGenFramebuffers(1, &main_fb);
@@ -330,6 +326,30 @@ int init()
 
 int window_size_update(void)
 {
+    glBindVertexArray(fb_rectangle_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, fb_rectangle_vbo);
+    float vs[4 * 3] = {
+        -1,      -1, 1, 1,      // main area
+        UNSPECF, -1, 1, UNSPECF, // compass
+        0,       -1, 1, 1,      // vertical view
+    };
+    switch (display_mode)
+    {
+    case DisplayMode__NORMAL:
+        // already good
+        break;
+
+    case DisplayMode__SPLIT:
+        vs[2] = 0; // make main area half width
+        break;
+
+    default:
+        assert(0);
+    }
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vs), vs, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(GLfloat), (GLvoid*)0);
+    glEnableVertexAttribArray(0);
+
     //float mag = sqrt(width * width + height * height);
 
     // TODO: update glTexImage2D when window size changes
@@ -341,10 +361,23 @@ int window_size_update(void)
     glUseProgram(base_shader);
     glUniformMatrix4fv(projection_loc, 1, GL_FALSE, projection);
 
+    float alt_w = width;
+    switch (display_mode)
+    {
+    case DisplayMode__NORMAL:
+        break;
+
+    case DisplayMode__SPLIT:
+        alt_w /= 2;
+        break;
+
+    default:
+        assert(0);
+    }
 
     glBindFramebuffer(GL_FRAMEBUFFER, main_fb);
     glBindTexture(GL_TEXTURE_2D, main_tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width * 2 / 3, height * 2 / 3, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, alt_w, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
     glBindRenderbuffer(GL_RENDERBUFFER, main_rbo);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
     CHECK_RES(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE);
@@ -360,7 +393,7 @@ int window_size_update(void)
 
     glBindFramebuffer(GL_FRAMEBUFFER, vertical_fb);
     glBindTexture(GL_TEXTURE_2D, vertical_tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width / 2, height / 2, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, alt_w, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
     glBindRenderbuffer(GL_RENDERBUFFER, vertical_rbo);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
@@ -423,7 +456,19 @@ void render(void)
     glDrawArrays(GL_LINES, 0, 2);
 
 
-    glViewport(0, 0, width * 2 / 3, height * 2 / 3);
+    switch (display_mode)
+    {
+    case DisplayMode__NORMAL:
+        glViewport(0, 0, width, height);
+        break;
+
+    case DisplayMode__SPLIT:
+        glViewport(0, 0, width / 2, height);
+        break;
+
+    default:
+        assert(0);
+    }
 
     glBindFramebuffer(GL_FRAMEBUFFER, main_fb);
     glClearColor(0.1f, ratio / 5, 0.1f, 1.0f);
@@ -448,27 +493,37 @@ void render(void)
         glDrawArrays(GL_TRIANGLES, 0, objects[i].l / 6);
     }
 
-
-    glViewport(0, 0, width / 2, height / 2);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, vertical_fb);
-    glClearColor(1, 1, 0, 1);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    glUniformMatrix4fv(view_loc, 1, GL_FALSE, view);
-
-    for (int i = 0; i < vertical_object_count; i++)
+    switch (display_mode)
     {
-        glBindVertexArray(vertical_VAOs[i]);
+    case DisplayMode__NORMAL:
+        break;
 
-        glBindBuffer(GL_ARRAY_BUFFER, vertical_VBOs[i]);
-        glBufferData(GL_ARRAY_BUFFER, vertical_objects[i].l * sizeof(float), vertical_objects[i].p, GL_STREAM_DRAW);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)0);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
-        glEnableVertexAttribArray(1);
+    case DisplayMode__SPLIT:
+        glViewport(0, 0, width / 2, height);
 
-        glDrawArrays(GL_TRIANGLES, 0, vertical_objects[i].l / 6);
+        glBindFramebuffer(GL_FRAMEBUFFER, vertical_fb);
+        glClearColor(1, 1, 0, 1);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glUniformMatrix4fv(view_loc, 1, GL_FALSE, view);
+
+        for (int i = 0; i < vertical_object_count; i++)
+        {
+            glBindVertexArray(vertical_VAOs[i]);
+
+            glBindBuffer(GL_ARRAY_BUFFER, vertical_VBOs[i]);
+            glBufferData(GL_ARRAY_BUFFER, vertical_objects[i].l * sizeof(float), vertical_objects[i].p, GL_STREAM_DRAW);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)0);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
+            glEnableVertexAttribArray(1);
+
+            glDrawArrays(GL_TRIANGLES, 0, vertical_objects[i].l / 6);
+        }
+        break;
+
+    default:
+        assert(0);
     }
 
 
@@ -482,10 +537,21 @@ void render(void)
     glDisable(GL_DEPTH_TEST);
     glBindTexture(GL_TEXTURE_2D, main_tex);
     glDrawArrays(GL_POINTS, 0, 1);
-    glBindTexture(GL_TEXTURE_2D, compass_tex);
-    glDrawArrays(GL_POINTS, 1, 1);
-    glBindTexture(GL_TEXTURE_2D, vertical_tex);
-    glDrawArrays(GL_POINTS, 2, 1);
+    /* glBindTexture(GL_TEXTURE_2D, compass_tex); */
+    /* glDrawArrays(GL_POINTS, 1, 1); */
+    switch (display_mode)
+    {
+    case DisplayMode__NORMAL:
+        break;
+
+    case DisplayMode__SPLIT:
+        glBindTexture(GL_TEXTURE_2D, vertical_tex);
+        glDrawArrays(GL_POINTS, 2, 1);
+        break;
+
+    default:
+        assert(0);
+    }
     glBindVertexArray(0);
 
 

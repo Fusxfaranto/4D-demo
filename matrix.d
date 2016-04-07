@@ -137,6 +137,31 @@ float dot_p()(auto ref in Vec4 a, auto ref in Vec4 b) pure
     return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
 }
 
+Mat4 outer_p()(auto ref in Vec4 a, auto ref in Vec4 b) pure
+{
+    return Mat4(
+        a.x * b.x,
+        a.y * b.x,
+        a.z * b.x,
+        a.w * b.x,
+
+        a.x * b.y,
+        a.y * b.y,
+        a.z * b.y,
+        a.w * b.y,
+
+        a.x * b.z,
+        a.y * b.z,
+        a.z * b.z,
+        a.w * b.z,
+
+        a.x * b.w,
+        a.y * b.w,
+        a.z * b.w,
+        a.w * b.w,
+        );
+}
+
 Vec4 ewise_p()(auto ref in Vec4 a, auto ref in Vec4 b) pure
 {
     return Vec4(a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w);
@@ -374,7 +399,7 @@ struct Mat4
     }
 
 
-    float determinant()
+    float determinant() const pure
     {
         return
             xx * yy * zz * ww +
@@ -403,7 +428,7 @@ struct Mat4
             xw * yz * zx * wy;
     }
 
-    Mat4 inverse()
+    Mat4 inverse() const pure
     {
         float det = determinant();
         assert(abs(det) > 1e-6);
@@ -431,6 +456,28 @@ struct Mat4
             );
     }
 
+    Mat4 transpose() const pure
+    {
+        return Mat4(
+            xx,
+            xy,
+            xz,
+            xw,
+            yx,
+            yy,
+            yz,
+            yw,
+            zx,
+            zy,
+            zz,
+            zw,
+            wx,
+            wy,
+            wz,
+            ww,
+            );
+    }
+
 
     Mat4 opBinary(string op)(auto ref in Mat4 b) if (op == "*")
     {
@@ -455,6 +502,31 @@ struct Mat4
             zx * b.xw + zy * b.yw + zz * b.zw + zw * b.ww,
             wx * b.xw + wy * b.yw + wz * b.zw + ww * b.ww,
             );
+    }
+
+    Mat4 opBinary(string op)(auto ref in Mat4 b) if (op == "+" || op == "-")
+    {
+        return mixin("Mat4(
+            xx" ~ op ~ "b.xx,
+            yx" ~ op ~ "b.yx,
+            zx" ~ op ~ "b.zx,
+            wx" ~ op ~ "b.wx,
+
+            xy" ~ op ~ "b.xy,
+            yy" ~ op ~ "b.yy,
+            zy" ~ op ~ "b.zy,
+            wy" ~ op ~ "b.wy,
+
+            xz" ~ op ~ "b.xz,
+            yz" ~ op ~ "b.yz,
+            zz" ~ op ~ "b.zz,
+            wz" ~ op ~ "b.wz,
+
+            xw" ~ op ~ "b.xw,
+            yw" ~ op ~ "b.yw,
+            zw" ~ op ~ "b.zw,
+            ww" ~ op ~ "b.ww
+            )");
     }
 
     Vec4 opBinary(string op)(auto ref in Vec4 b) if (op == "*")
@@ -639,10 +711,34 @@ Vec4 proj()(auto ref in Vec4 v, auto ref in Vec4 onto)
 }
 
 
+Mat4 rot(bool this_plane = true)(auto ref in Vec4 basis1, auto ref in Vec4 basis2, float theta)
+{
+    static if (!this_plane)
+    {
+        return rot_alt!this_plane(basis1, basis2, theta);
+    }
+
+    // TODO: is there a cleaner way to do this?
+    if (abs(dot_p(basis1, basis2) / (basis1.magnitude() * basis2.magnitude)) > (1 - 1e-6))
+    {
+        //writeln(basis1, "\t", basis2);
+        return Mat4.init;
+    }
+
+    Vec4 a = basis1.normalized();
+    Vec4 b = (basis2 - proj(basis2, a)).normalized();
+
+    Mat4 g = outer_p(b, a) - outer_p(a, b);
+    Mat4 p = outer_p(a, a) + outer_p(b, b);
+
+    return Mat4.init + sin(theta) * g + (cos(theta) - 1) * p;
+}
+
+
 // when this_plane is true, the vector arguments define the plane of rotation
 // otherwise, they define the axis plane of rotation (i.e. fixed plane)
 // http://forums.xkcd.com/viewtopic.php?p=956761&sid=f4887c64a6a886e7e1fc5ee96cadbf3a#p956761
-Mat4 rot(bool this_plane = true)(auto ref in Vec4 basis1, auto ref in Vec4 basis2, float theta)
+Mat4 rot_alt(bool this_plane = true)(auto ref in Vec4 basis1, auto ref in Vec4 basis2, float theta)
 {
     // enum Vec4[4] standard_basis = [
     //     Vec4(1, 0, 0, 0),
@@ -681,7 +777,6 @@ Mat4 rot(bool this_plane = true)(auto ref in Vec4 basis1, auto ref in Vec4 basis
             e[0].w * e[1].y - e[0].y * e[1].w,
             0
             );
-
         if (abs(e[2].magnitude()) < 1e-6)
         {
             e[2] = Vec4(
@@ -812,6 +907,9 @@ Mat4 rot(bool this_plane = true)(auto ref in Vec4 basis1, auto ref in Vec4 basis
             );
     }
 
-
-    return b * r * b.inverse();
+    assert(abs(b.transpose().determinant()) > (1 - 1e-6) && abs(b.transpose().determinant()) < (1 + 1e-6));
+    return b * r * b.transpose();
 }
+
+
+// TODO: https://en.wikipedia.org/wiki/Levi-Civita_symbol#Four_dimensions ???

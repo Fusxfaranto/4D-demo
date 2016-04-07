@@ -4,6 +4,8 @@ struct GLFWwindow;
 extern (C) void glfwPollEvents();
 extern (C) int glfwWindowShouldClose(GLFWwindow* window);
 extern (C) int glfwGetKey(GLFWwindow* window, int key);
+alias GLFWkeyfun = extern (C) void function(GLFWwindow* window, int key, int scancode, int action, int mods);
+extern (C) GLFWkeyfun glfwSetKeyCallback(GLFWwindow* window, GLFWkeyfun cbfun);
 
 extern (C) int glGetError();
 
@@ -18,6 +20,7 @@ extern (C) extern __gshared GLFWwindow* w;
 extern (C) extern __gshared int width;
 extern (C) extern __gshared int height;
 extern (C) extern __gshared immutable(char)* title;
+extern (C) extern __gshared int display_mode;
 extern (C) extern __gshared float* compass_base;
 extern (C) extern __gshared float* compass;
 extern (C) extern __gshared float[][MAX_OBJECTS] objects;
@@ -28,6 +31,12 @@ extern (C) extern __gshared float* view;
 extern (C) extern __gshared float* projection;
 extern (C) extern __gshared float* compass_projection;
 
+
+enum DisplayMode
+{
+    NORMAL = 0,
+    SPLIT = 1,
+}
 
 enum GLError
 {

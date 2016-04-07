@@ -15,10 +15,11 @@ OBJS := $(C_OBJS) $(D_OBJS)
 
 #CC := ./gdc/x86_64-pc-linux-gnu/bin/x86_64-linux-gnu-gcc
 #DC := ./gdc/x86_64-pc-linux-gnu/bin/x86_64-linux-gnu-gdc
-DC := ./ldc/build/bin/ldc2
+#DC := ./ldc/build/bin/ldc2
+DC := dmd
 
 CFLAGS := -m64 -g -c -std=c11 -pedantic -Wall -Werror
-DFLAGS := -m64 -g -c
+DFLAGS := -m64 -g -c -profile
 #LDFLAGS := -Llib -lm -lSOIL -lGLEW -lglfw -lGL
 LDFLAGS := -L-Llib -L-lm -L-lSOIL -L-lGLEW -L-lglfw -L-lGL
 

@@ -26,12 +26,15 @@ Vec3 camera_pos = Vec3(0, 0, 3);
 float fov = deg_to_rad(45);
 
 Vec4 char_pos = Vec4(0, 0.4, 0, 0.5);
-Vec4 char_front = Vec4(0, 0, 1, 0);
-Vec4 char_up = Vec4(0, 1, 0, 0);
+Vec4 char_front = Vec4(0, 0.3, 1, 0).normalized();
+Vec4 char_up = Vec4(0, 1, -0.3, 0).normalized();
 Vec4 char_normal = Vec4(0, 0, 0, 1);
 enum Vec4 global_up = Vec4(0, 1, 0, 0);
 
 Mat4 view_mat, projection_mat, compass_projection_mat;
+
+bool char_enabled = true;
+bool force_window_size_update = false;
 
 
 
@@ -42,33 +45,34 @@ void main()
 
     width = 1280;
     height = 800;
+    display_mode = DisplayMode.NORMAL;
 
 
     Vec3 compass_base_ = Vec3(0, 0, 0);
     compass_base = compass_base_.data();
 
 
-    World world;
-    world.scene ~= tesseract(Vec4(-30, -30, -30, -30), Vec4(60, 60, 60, 60));
-    world.scene ~= tesseract(Vec4(-10, -2, -10, -10), Vec4(20, 2, 20, 20));
-    world.scene ~= tesseract(Vec4(-3.5, 2, -6, 3), Vec4(1, 1, 1, 1),
-                             rot(Vec4(1, 1, 1, 1), Vec4(0, 0, 0, 1), deg_to_rad(45)));
-    world.scene ~= tesseract(Vec4(-.5, 0, -3, 0), Vec4(1, 1, 1, 1));
-    world.scene ~= tesseract(Vec4(1, 0, -3, 0), Vec4(1, 1, 1, 5));
-    world.scene ~= tesseract(Vec4(0, 0, 3, 0));
-    world.scene ~= tesseract(Vec4(0, 0, 4, 0));
-    world.scene ~= tesseract(Vec4(0, 0, 5, 0));
-    world.scene ~= tesseract(Vec4(1, 0, 4, 0));
-    world.scene ~= tesseract(Vec4(-1, 0, 4, 0));
-    world.scene ~= tesseract(Vec4(0, 0, 4, 1));
-    world.scene ~= tesseract(Vec4(0, 0, 4, -1));
-    world.scene ~= tesseract(Vec4(0, 1, 4, 0));
-    world.scene ~= fivecell(Vec4(4, 2, 4, 0));
-    world.scene ~= tesseract(Vec4(4, 0, -4, 0), Vec4(0.2, 1.5, 3, 1));
-    world.scene ~= tesseract(Vec4(5.6, 0, -4, 0), Vec4(0.2, 1.5, 3, 1));
-    world.scene ~= tesseract(Vec4(4.2, 0, -4, 0), Vec4(1.4, 1.5, 0.2, 1));
-    world.scene ~= tesseract(Vec4(4.2, 0, -1.2, 0), Vec4(1.4, 1.5, 0.2, 1));
-    world.scene ~= tesseract(Vec4(4, 1.5, -4, 0), Vec4(1.8, 0.2, 3, 1));
+    World world;/*
+                  world.scene ~= tesseract(Vec4(-30, -30, -30, -30), Vec4(60, 60, 60, 60));
+                  world.scene ~= tesseract(Vec4(-10, -2, -10, -10), Vec4(20, 2, 20, 20));
+                  world.scene ~= tesseract(Vec4(-3.5, 2, -6, 3), Vec4(1, 1, 1, 1),
+                  rot(Vec4(1, 1, 1, 1), Vec4(0, 0, 0, 1), deg_to_rad(45)));
+                  world.scene ~= tesseract(Vec4(-.5, 0, -3, 0), Vec4(1, 1, 1, 1));
+                  world.scene ~= tesseract(Vec4(1, 0, -3, 0), Vec4(1, 1, 1, 5));
+                  world.scene ~= tesseract(Vec4(0, 0, 3, 0));
+                  world.scene ~= tesseract(Vec4(0, 0, 4, 0));
+                  world.scene ~= tesseract(Vec4(0, 0, 5, 0));
+                  world.scene ~= tesseract(Vec4(1, 0, 4, 0));
+                  world.scene ~= tesseract(Vec4(-1, 0, 4, 0));
+                  world.scene ~= tesseract(Vec4(0, 0, 4, 1));
+                  world.scene ~= tesseract(Vec4(0, 0, 4, -1));
+                  world.scene ~= tesseract(Vec4(0, 1, 4, 0));
+                  world.scene ~= fivecell(Vec4(4, 2, 4, 0));
+                  world.scene ~= tesseract(Vec4(4, 0, -4, 0), Vec4(0.2, 1.5, 3, 1));
+                  world.scene ~= tesseract(Vec4(5.6, 0, -4, 0), Vec4(0.2, 1.5, 3, 1));
+                  world.scene ~= tesseract(Vec4(4.2, 0, -4, 0), Vec4(1.4, 1.5, 0.2, 1));
+                  world.scene ~= tesseract(Vec4(4.2, 0, -1.2, 0), Vec4(1.4, 1.5, 0.2, 1));
+                  world.scene ~= tesseract(Vec4(4, 1.5, -4, 0), Vec4(1.8, 0.2, 3, 1));*/
     //scene ~= tesseract(Vec4(1, 0, 0, 0));
     //scene ~= tesseract(Vec4(0, 1, 0, 0));
     //scene ~= tesseract(Vec4(1, 1, 0, 0));
@@ -94,6 +98,8 @@ void main()
     handle_errors!init();
     scope(exit) cleanup();
 
+    glfwSetKeyCallback(w, &key_callback);
+
     int t = 0;
     int last_width = -1, last_height = -1;
     float last_fov = fov;
@@ -108,17 +114,37 @@ void main()
 
         process_input();
 
-        if (last_width != width || last_height != height || last_fov != fov)
+        if (force_window_size_update || last_width != width || last_height != height || last_fov != fov)
         {
-            projection_mat = perspective(fov, cast(float)(width) / height, 0.1, 100);
+            float r = cast(float)(width) / height;
+            final switch (display_mode.to!DisplayMode)
+            {
+            case DisplayMode.NORMAL:
+                break;
+
+            case DisplayMode.SPLIT:
+                r /= 2;
+                break;
+            }
+            projection_mat = perspective(fov, r, 0.1, 100);
             compass_projection_mat = perspective(deg_to_rad(45), width, 0.1, 100);
             //projection_mat = orthographic(-width / 400.0, width / 400.0, -height / 400.0, height / 400.0, -10, 100);
             last_height = height;
             last_width = width;
             last_fov = fov;
+            force_window_size_update = false;
 
             handle_errors!window_size_update();
         }
+
+        world.scene = tesseract!(false, solid_color_gen!(0.5, 0.5, 0.5))(Vec4(-30, -30, -30, -30), Vec4(60, 60, 60, 60));
+        world.scene ~= tesseract!(false, solid_color_gen!(0.6, 0.5, 0.1))(Vec4(-10, -2, -10, -10), Vec4(20, 2, 20, 20));
+        world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, 5, 0));
+        world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, -5, 0));
+        world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(-5, 0, 5, 0));
+        world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(-5, 0, -5, 0));
+        world.scene ~= tesseract!(true)(Vec4(0, 0.8, 0, 0.5), Vec4(1, 1, 1, 1),
+                                        rot(Vec4(0, 1, 0, 0), Vec4(1, 0, 0, 0), last_time.msecs() / 1000.0));
 
         Vec4 flat_front = (char_front - proj(char_front, global_up)).normalized();
         Vec4 flat_normal = (char_normal - proj(char_normal, global_up)).normalized();
@@ -204,7 +230,7 @@ void cross_section(ref in World world, out float[][MAX_OBJECTS] objects, out int
                             dot_p(right, rel_intersection_point),
                             dot_p(up, rel_intersection_point),
                             dot_p(front, rel_intersection_point),
-                            tet[i].color_r, tet[i].color_b, tet[i].color_g
+                            tet[i].color_r, tet[i].color_g, tet[i].color_b
                             ];
                         verts_added++;
                     }
@@ -217,10 +243,113 @@ void cross_section(ref in World world, out float[][MAX_OBJECTS] objects, out int
     }
 
     run(world.scene);
-    run(world.character);
+    if (char_enabled)
+    {
+        run(world.character);
+    }
 }
 
 
+
+extern (C) void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (action != GLFWKeyStatus.GLFW_PRESS)
+    {
+        return;
+    }
+
+    switch (key)
+    {
+    case GLFWKey.GLFW_KEY_SPACE:
+    {
+        writeln("front: ", char_front);
+        writeln("up: ", char_up);
+        writeln("normal: ", char_normal);
+        writeln("right: ", cross_p(char_up, char_front, char_normal));
+        writeln("position: ", char_pos);
+
+        writeln(dot_p(char_normal, char_up));
+        writeln(dot_p(char_front, char_up));
+        writeln(dot_p(char_front, char_normal));
+
+        Vec4 flat_front = char_front - proj(char_front, global_up);
+        writeln(flat_front);
+        writeln(acos(dot_p(Vec4(1, 0, 0, 0), flat_front)
+                     / flat_front.magnitude()) * 180 / PI);
+        writeln(rot(Vec4(1, 0, 0, 0), flat_front,
+                    acos(dot_p(Vec4(1, 0, 0, 0), flat_front)
+                         / flat_front.magnitude())));
+
+        writeln();
+        break;
+    }
+
+    case GLFWKey.GLFW_KEY_ENTER:
+    {
+        if (view_mat == Mat4.init)
+        {
+            view_mat = look_at(camera_pos, Vec3(0, 0, 0), Vec3(0, 1, 0));
+            char_enabled = true;
+        }
+        else
+        {
+            view_mat = Mat4.init;
+            char_enabled = false;
+        }
+        break;
+    }
+
+    case GLFWKey.GLFW_KEY_BACKSLASH:
+    {
+        display_mode++;
+        if (display_mode > DisplayMode.max)
+        {
+            display_mode = DisplayMode.min;
+        }
+        assert(display_mode == display_mode.to!DisplayMode);
+        force_window_size_update = true;
+        break;
+    }
+
+    case GLFWKey.GLFW_KEY_BACKSPACE:
+    {
+        char_enabled ^= true;
+        break;
+    }
+
+    case GLFWKey.GLFW_KEY_1:
+    {
+        char_enabled = true;
+        char_pos = Vec4(0, 0.7, 0, 0.5);
+        char_front = Vec4(0, 0.3, 1, 0).normalized();
+        char_up = Vec4(0, 1, -0.3, 0).normalized();
+        char_normal = Vec4(0, 0, 0, 1);
+        camera_pos.z = 3;
+        view_mat = look_at(camera_pos, Vec3(0, 0, 0), Vec3(0, 1, 0));
+        break;
+    }
+
+    case GLFWKey.GLFW_KEY_2:
+    {
+        char_pos = Vec4(0, .7, 0, 0);
+        char_front = Vec4(-.01, 0, 1, 0).normalized();
+        char_up = Vec4(0, 1, 0, 0);
+        char_normal = Vec4(0, 0, 0, 1);
+        break;
+    }
+
+    case GLFWKey.GLFW_KEY_3:
+    {
+        char_front = Vec4(0, 0, 1, 0);
+        char_up = Vec4(0, 0, 0, 1);
+        char_normal = Vec4(0, 1, 0, 0);
+        break;
+    }
+
+    default:
+        break;
+    }
+}
 
 void process_input()
 {
@@ -379,62 +508,6 @@ void process_input()
         view_mat = look_at(camera_pos, Vec3(0, 0, 0), Vec3(0, 1, 0));
     }
 
-
-    if (get_key(GLFWKey.GLFW_KEY_SPACE) == GLFWKeyStatus.GLFW_PRESS)
-    {
-        writeln("front: ", char_front);
-        writeln("up: ", char_up);
-        writeln("normal: ", char_normal);
-        writeln("right: ", cross_p(char_up, char_front, char_normal));
-        writeln("position: ", char_pos);
-
-        writeln(dot_p(char_normal, char_up));
-        writeln(dot_p(char_front, char_up));
-        writeln(dot_p(char_front, char_normal));
-
-        Vec4 flat_front = char_front - proj(char_front, global_up);
-        writeln(flat_front);
-        writeln(acos(dot_p(Vec4(1, 0, 0, 0), flat_front)
-                     / flat_front.magnitude()) * 180 / PI);
-        writeln(rot(Vec4(1, 0, 0, 0), flat_front,
-                    acos(dot_p(Vec4(1, 0, 0, 0), flat_front)
-                         / flat_front.magnitude())));
-
-        writeln();
-    }
-    if (get_key(GLFWKey.GLFW_KEY_ENTER) == GLFWKeyStatus.GLFW_PRESS)
-    {
-        if (view_mat == Mat4.init)
-        {
-            view_mat = look_at(camera_pos, Vec3(0, 0, 0), Vec3(0, 1, 0));
-        }
-        else
-        {
-            view_mat = Mat4.init;
-        }
-    }
-    if (get_key(GLFWKey.GLFW_KEY_1) == GLFWKeyStatus.GLFW_PRESS)
-    {
-        char_pos = Vec4(0, 0.7, 0, 0.5);
-        char_front = Vec4(0, 0, 1, 0);
-        char_up = Vec4(0, 1, 0, 0);
-        char_normal = Vec4(0, 0, 0, 1);
-        camera_pos.z = 3;
-        view_mat = look_at(camera_pos, Vec3(0, 0, 0), Vec3(0, 1, 0));
-    }
-    if (get_key(GLFWKey.GLFW_KEY_2) == GLFWKeyStatus.GLFW_PRESS)
-    {
-        char_pos = Vec4(0, .7, 0, 0);
-        char_front = Vec4(-.01, 0, 1, 0).normalized();
-        char_up = Vec4(0, 1, 0, 0);
-        char_normal = Vec4(0, 0, 0, 1);
-    }
-    if (get_key(GLFWKey.GLFW_KEY_3) == GLFWKeyStatus.GLFW_PRESS)
-    {
-        char_front = Vec4(0, 0, 1, 0);
-        char_up = Vec4(0, 0, 0, 1);
-        char_normal = Vec4(0, 1, 0, 0);
-    }
 
 
     // TODO: else if?
