@@ -6,6 +6,7 @@ import std.datetime : TickDuration;
 import std.array : array;
 import std.algorithm : sum, map;
 
+import util;
 import render_bindings;
 import matrix;
 import shapes;
@@ -35,6 +36,20 @@ Mat4 view_mat, projection_mat, compass_projection_mat;
 
 bool char_enabled = true;
 bool force_window_size_update = false;
+
+
+enum TextDisplay
+{
+    NONE,
+    BLOCK,
+    POS,
+}
+TextDisplay text_display;
+
+Mat4 test_rot_mat;
+Vec4[2] test_plane = [Vec4(0.5, 0.5, 0.5, 0.5), Vec4(-0.5, -0.5, 0.5, 0.5)];
+float test_angle = 0;
+
 
 
 
@@ -137,14 +152,57 @@ void main()
             handle_errors!window_size_update();
         }
 
-        world.scene = tesseract!(false, solid_color_gen!(0.5, 0.5, 0.5))(Vec4(-30, -30, -30, -30), Vec4(60, 60, 60, 60));
+        Vec4 char_right = cross_p(char_up, char_front, char_normal);
+
+        test_rot_mat = rot(test_plane[0], test_plane[1], test_angle);
+        final switch (text_display)
+        {
+        case TextDisplay.NONE:
+            lines_to_render = [];
+            break;
+
+        case TextDisplay.BLOCK:
+            lines_to_render = [
+                format("plane:  %6.3f, %6.3f, %6.3f, %6.3f\0",
+                       test_plane[0].x, test_plane[0].y, test_plane[0].z, test_plane[0].w).ptr,
+                format("        %6.3f, %6.3f, %6.3f, %6.3f\0",
+                       test_plane[1].x, test_plane[1].y, test_plane[1].z, test_plane[1].w).ptr,
+                format("angle:  %6.3f\0", (test_angle * 180.0 / PI) % 360).ptr,
+                format("matrix: %6.3f, %6.3f, %6.3f, %6.3f\0",
+                       test_rot_mat.xx, test_rot_mat.xy, test_rot_mat.xz, test_rot_mat.xw).ptr,
+                format("        %6.3f, %6.3f, %6.3f, %6.3f\0",
+                       test_rot_mat.yx, test_rot_mat.yy, test_rot_mat.yz, test_rot_mat.yw).ptr,
+                format("        %6.3f, %6.3f, %6.3f, %6.3f\0",
+                       test_rot_mat.zx, test_rot_mat.zy, test_rot_mat.zz, test_rot_mat.zw).ptr,
+                format("        %6.3f, %6.3f, %6.3f, %6.3f\0",
+                       test_rot_mat.wx, test_rot_mat.wy, test_rot_mat.wz, test_rot_mat.ww).ptr,
+                ];
+            break;
+
+        case TextDisplay.POS:
+            lines_to_render = [
+                format("front:    %6.3f, %6.3f, %6.3f, %6.3f\0",
+                       char_front.x, char_front.y, char_front.z, char_front.w).ptr,
+                format("up:       %6.3f, %6.3f, %6.3f, %6.3f\0",
+                       char_up.x, char_up.y, char_up.z, char_up.w).ptr,
+                format("right:    %6.3f, %6.3f, %6.3f, %6.3f\0",
+                       char_right.x, char_right.y, char_right.z, char_right.w).ptr,
+                format("normal:   %6.3f, %6.3f, %6.3f, %6.3f\0",
+                       char_normal.x, char_normal.y, char_normal.z, char_normal.w).ptr,
+                format("position: %6.3f, %6.3f, %6.3f, %6.3f\0",
+                       char_pos.x, char_pos.y, char_pos.z, char_pos.w).ptr,
+                ];
+            break;
+        }
+
+        world.scene = [];
+        world.scene ~= tesseract!(false, solid_color_gen!(0.5, 0.5, 0.5))(Vec4(-30, -30, -30, -30), Vec4(60, 60, 60, 60));
         world.scene ~= tesseract!(false, solid_color_gen!(0.6, 0.5, 0.1))(Vec4(-10, -2, -10, -10), Vec4(20, 2, 20, 20));
-        world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, 5, 0));
-        world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, -5, 0));
-        world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(-5, 0, 5, 0));
-        world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(-5, 0, -5, 0));
-        world.scene ~= tesseract!(true)(Vec4(0, 0.8, 0, 0.5), Vec4(1, 1, 1, 1),
-                                        rot(Vec4(0, 1, 0, 0), Vec4(1, 0, 0, 0), last_time.msecs() / 1000.0));
+        world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, 5, 0), Vec4(1, 3, 1, 1));
+        world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, -5, 0), Vec4(1, 3, 1, 1));
+        world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(-5, 0, 5, 0), Vec4(1, 3, 1, 1));
+        world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(-5, 0, -5, 0), Vec4(1, 3, 1, 1));
+        world.scene ~= tesseract!(true)(Vec4(0, 1.1, 0, 0.5), Vec4(1, 1, 1, 1), test_rot_mat);
 
         Vec4 flat_front = (char_front - proj(char_front, global_up)).normalized();
         Vec4 flat_normal = (char_normal - proj(char_normal, global_up)).normalized();
@@ -160,7 +218,6 @@ void main()
         Vec3 compass_ = Vec3(-flat_front.x, flat_front.w, flat_front.z) + compass_base_;
         compass = compass_.data();
 
-        Vec4 char_right = cross_p(char_up, char_front, char_normal);
         cross_section(world, objects, object_count,
                       char_pos, char_up, char_front, char_normal, char_right);
         cross_section(world, vertical_objects, vertical_object_count,
@@ -346,6 +403,12 @@ extern (C) void key_callback(GLFWwindow* window, int key, int scancode, int acti
         break;
     }
 
+    case GLFWKey.GLFW_KEY_EQUAL:
+    {
+        text_display = inc_enum!TextDisplay(text_display);
+        break;
+    }
+
     default:
         break;
     }
@@ -496,7 +559,7 @@ void process_input()
 
     if (get_key(GLFWKey.GLFW_KEY_Z) == GLFWKeyStatus.GLFW_PRESS)
     {
-        if (camera_pos.z > 0.1)
+        if (char_enabled && camera_pos.z > 0.1)
         {
             camera_pos.z -= speed;
             view_mat = look_at(camera_pos, Vec3(0, 0, 0), Vec3(0, 1, 0));
@@ -504,8 +567,22 @@ void process_input()
     }
     if (get_key(GLFWKey.GLFW_KEY_X) == GLFWKeyStatus.GLFW_PRESS)
     {
-        camera_pos.z += speed;
-        view_mat = look_at(camera_pos, Vec3(0, 0, 0), Vec3(0, 1, 0));
+        if (char_enabled)
+        {
+            camera_pos.z += speed;
+            view_mat = look_at(camera_pos, Vec3(0, 0, 0), Vec3(0, 1, 0));
+        }
+    }
+
+
+
+    if (get_key(GLFWKey.GLFW_KEY_T) == GLFWKeyStatus.GLFW_PRESS)
+    {
+        test_angle += rot_speed;
+    }
+    if (get_key(GLFWKey.GLFW_KEY_G) == GLFWKeyStatus.GLFW_PRESS)
+    {
+        test_angle -= rot_speed;
     }
 
 

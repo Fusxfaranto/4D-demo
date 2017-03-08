@@ -30,6 +30,7 @@ extern (C) extern __gshared int vertical_object_count;
 extern (C) extern __gshared float* view;
 extern (C) extern __gshared float* projection;
 extern (C) extern __gshared float* compass_projection;
+extern (C) extern __gshared immutable(char)*[] lines_to_render;
 
 
 enum DisplayMode
@@ -191,12 +192,3 @@ GLFWKeyStatus get_key(GLFWKey k)
     return glfwGetKey(w, k).to!GLFWKeyStatus;
 }
 
-
-void handle_errors(alias F, Args...)(Args a) if (is(typeof(F(a)) : int))
-{
-    int res = F(a);
-    if (res != 0)
-    {
-        throw new Error("error code " ~ res.to!string);
-    }
-}

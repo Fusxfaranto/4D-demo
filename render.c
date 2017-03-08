@@ -1,25 +1,8 @@
 
-#define GLEW_STATIC
-#include <GL/glew.h>
 
-#include <GLFW/glfw3.h>
+#include "util.h"
+#include "text.h"
 
-#include "include/SOIL.h"
-
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <math.h>
-#include <assert.h>
-
-
-#define CHECK_RES(x)                            \
-    {                                           \
-        int __res;                              \
-        if ((__res = (x)))                      \
-            return __res;                       \
-    }
-#define ARRAY_LEN(x) (sizeof(x) / sizeof(x[0]))
 
 
 typedef struct
@@ -27,6 +10,11 @@ typedef struct
     size_t l;
     float *p;
 } FloatDArray;
+typedef struct
+{
+    size_t l;
+    const char **p;
+} StringDArray;
 
 
 const float UNSPECF = 37.0;
@@ -79,6 +67,9 @@ GLuint vertical_rbo;
 
 float *view, *projection;
 
+Font *font;
+StringDArray lines_to_render;
+
 
 
 void cleanup(void)
@@ -91,6 +82,8 @@ void cleanup(void)
     }
     //glDeleteBuffers(1, &EBO);
     glfwTerminate();
+
+    delete_font(font);
 }
 
 static void error_callback(int error, const char *description)
@@ -99,101 +92,7 @@ static void error_callback(int error, const char *description)
     error++; // silence warning
 }
 
-static int create_shader(GLuint *shader_program, const char *vs_filename,
-                         const char* gs_filename, const char *fs_filename)
-{
-    GLint success;
-    GLchar buffer[1024];
-    const GLchar *buffer_p = buffer;
-
-    FILE *f = fopen(vs_filename, "r");
-    int l = fread(buffer, sizeof(buffer[0]), ARRAY_LEN(buffer) - 1, f);
-    buffer[l] = '\0';
-    fclose(f);
-
-    GLuint vs = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vs, 1, &buffer_p, NULL);
-    glCompileShader(vs);
-    glGetShaderiv(vs, GL_COMPILE_STATUS, &success);
-    if (!success)
-    {
-        glGetShaderInfoLog(vs, ARRAY_LEN(buffer), NULL, buffer);
-        fprintf(stderr, "vertex shader compilation error:\n%.*s\n", (int)ARRAY_LEN(buffer), buffer);
-        cleanup();
-        return EXIT_FAILURE;
-    }
-
-
-    f = fopen(fs_filename, "r");
-    l = fread(buffer, sizeof(buffer[0]), ARRAY_LEN(buffer) - 1, f);
-    buffer[l] = '\0';
-    fclose(f);
-
-    GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fs, 1, &buffer_p, NULL);
-    glCompileShader(fs);
-    glGetShaderiv(fs, GL_COMPILE_STATUS, &success);
-    if (!success)
-    {
-        fputs(buffer, stderr);
-        glGetShaderInfoLog(fs, ARRAY_LEN(buffer), NULL, buffer);
-        fprintf(stderr, "fragment shader compilation error:\n%.*s\n", (int)ARRAY_LEN(buffer), buffer);
-        cleanup();
-        return EXIT_FAILURE;
-    }
-
-
-    GLuint gs = 0;
-    if (gs_filename)
-    {
-        f = fopen(gs_filename, "r");
-        l = fread(buffer, sizeof(buffer[0]), ARRAY_LEN(buffer) - 1, f);
-        buffer[l] = '\0';
-        fclose(f);
-
-        gs = glCreateShader(GL_GEOMETRY_SHADER);
-        glShaderSource(gs, 1, &buffer_p, NULL);
-        glCompileShader(gs);
-        glGetShaderiv(gs, GL_COMPILE_STATUS, &success);
-        if (!success)
-        {
-            fputs(buffer, stderr);
-            glGetShaderInfoLog(gs, ARRAY_LEN(buffer), NULL, buffer);
-            fprintf(stderr, "geometry shader compilation error:\n%.*s\n", (int)ARRAY_LEN(buffer), buffer);
-            cleanup();
-            return EXIT_FAILURE;
-        }
-    }
-
-
-    *shader_program = glCreateProgram();
-    glAttachShader(*shader_program, vs);
-    if (gs_filename)
-    {
-        glAttachShader(*shader_program, gs);
-    }
-    glAttachShader(*shader_program, fs);
-    glLinkProgram(*shader_program);
-    glGetProgramiv(*shader_program, GL_LINK_STATUS, &success);
-    if (!success)
-    {
-        glGetProgramInfoLog(*shader_program, ARRAY_LEN(buffer), NULL, buffer);
-        fprintf(stderr, "shader linking error:\n%.*s\n", (int)ARRAY_LEN(buffer), buffer);
-        cleanup();
-        return EXIT_FAILURE;
-    }
-
-    glDeleteShader(vs);
-    if (gs_filename)
-    {
-        glDeleteShader(gs);
-    }
-    glDeleteShader(fs);
-
-    return 0;
-}
-
-int init()
+int init(void)
 {
     glfwSetErrorCallback(error_callback);
 
@@ -321,6 +220,11 @@ int init()
     //glEnable(GL_CULL_FACE);
     glEnable(GL_MULTISAMPLE);
 
+
+    font_init();
+    font = load_font("font_0.png");
+
+
     return 0;
 }
 
@@ -329,9 +233,9 @@ int window_size_update(void)
     glBindVertexArray(fb_rectangle_vao);
     glBindBuffer(GL_ARRAY_BUFFER, fb_rectangle_vbo);
     float vs[4 * 3] = {
-        -1,      -1, 1, 1,      // main area
+        -1,      -1, 1, 1,       // main area
         UNSPECF, -1, 1, UNSPECF, // compass
-        0,       -1, 1, 1,      // vertical view
+        0,       -1, 1, 1,       // vertical view
     };
     switch (display_mode)
     {
@@ -352,7 +256,6 @@ int window_size_update(void)
 
     //float mag = sqrt(width * width + height * height);
 
-    // TODO: update glTexImage2D when window size changes
     glUseProgram(compass_shader);
     // TODO: actually use this; and then see if it really needs to be updated on window size change
     glUniformMatrix4fv(compass_projection_location, 1, GL_FALSE, compass_projection);
@@ -471,7 +374,7 @@ void render(void)
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, main_fb);
-    glClearColor(0.1f, ratio / 5, 0.1f, 1.0f);
+    glClearColor(1.0, 243.0 / 255.0, 221.0 / 255.0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glUseProgram(base_shader);
@@ -555,7 +458,12 @@ void render(void)
     glBindVertexArray(0);
 
 
-    glBindVertexArray(0);
+    for (size_t i = 0; i < lines_to_render.l; i++)
+    {
+        //render_text(lines_to_render.p[i], font, -0.6, 1 - i * 0.1, 0.000001 * height, 0.000001 * width);
+        render_text(lines_to_render.p[i], font, -0.6, 1 - i * 0.1, 0.001, 0.001 * ratio);
+    }
+
 
     glfwSwapBuffers(w);
 

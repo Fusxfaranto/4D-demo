@@ -713,11 +713,6 @@ Vec4 proj()(auto ref in Vec4 v, auto ref in Vec4 onto)
 
 Mat4 rot(bool this_plane = true)(auto ref in Vec4 basis1, auto ref in Vec4 basis2, float theta)
 {
-    static if (!this_plane)
-    {
-        return rot_alt!this_plane(basis1, basis2, theta);
-    }
-
     // TODO: is there a cleaner way to do this?
     if (abs(dot_p(basis1, basis2) / (basis1.magnitude() * basis2.magnitude)) > (1 - 1e-6))
     {
@@ -727,6 +722,55 @@ Mat4 rot(bool this_plane = true)(auto ref in Vec4 basis1, auto ref in Vec4 basis
 
     Vec4 a = basis1.normalized();
     Vec4 b = (basis2 - proj(basis2, a)).normalized();
+
+    static if (!this_plane)
+    {
+        // TODO: is this faster?
+        //return rot_alt!this_plane(basis1, basis2, theta);
+
+        Vec4 new_a = Vec4(
+            a.y * b.z - a.z * b.y,
+            a.z * b.x - a.x * b.z,
+            a.x * b.y - a.y * b.x,
+            0
+            );
+        if (abs(new_a.magnitude()) < 1e-6)
+        {
+            new_a = Vec4(
+                a.y * b.z - a.z * b.y,
+                a.z * b.w - a.w * b.z,
+                a.w * b.y - a.y * b.w,
+                0
+                );
+            if (abs(new_a.magnitude()) < 1e-6)
+            {
+                new_a = Vec4(
+                    a.x * b.z - a.z * b.x,
+                    a.z * b.w - a.w * b.z,
+                    a.w * b.x - a.x * b.w,
+                    0
+                    );
+                assert(abs(new_a.magnitude()) > 1e-6,
+                       format("\n%s\n%s\n%s\n%s", a, b,
+                              Vec4(
+                                  a.y * b.z - a.z * b.y,
+                                  a.z * b.x - a.x * b.z,
+                                  a.x * b.y - a.y * b.x,
+                                  0
+                                  ),
+                              Vec4(
+                                  a.y * b.z - a.z * b.y,
+                                  a.z * b.w - a.w * b.z,
+                                  a.w * b.y - a.y * b.w,
+                                  0
+                                  ), new_a));
+            }
+        }
+        new_a.normalize();
+
+        b = cross_p(a, b, new_a);
+        a = new_a;
+    }
 
     Mat4 g = outer_p(b, a) - outer_p(a, b);
     Mat4 p = outer_p(a, a) + outer_p(b, b);
