@@ -17,6 +17,8 @@ typedef struct
 } StringDArray;
 
 
+
+
 const float UNSPECF = 37.0;
 
 enum
@@ -68,7 +70,16 @@ GLuint vertical_rbo;
 float *view, *projection;
 
 Font *font;
-StringDArray lines_to_render;
+#define MAX_TEXTS 16
+struct
+{
+    StringDArray a;
+    float x;
+    float y;
+    float x_scale;
+    float y_scale;
+    float line_spacing;
+} screen_text_data[MAX_TEXTS];
 
 
 
@@ -458,10 +469,22 @@ void render(void)
     glBindVertexArray(0);
 
 
-    for (size_t i = 0; i < lines_to_render.l; i++)
+    for (size_t i = 0; i < MAX_TEXTS; i++)
     {
-        //render_text(lines_to_render.p[i], font, -0.6, 1 - i * 0.1, 0.000001 * height, 0.000001 * width);
-        render_text(lines_to_render.p[i], font, -0.6, 1 - i * 0.1, 0.001, 0.001 * ratio);
+        if (screen_text_data[i].a.p)
+        {
+            for (size_t j = 0; j < screen_text_data[i].a.l; j++)
+            {
+                //render_text(lines_to_render.p[i], font, -0.6, 1 - i * 0.1, 0.000001 * height, 0.000001 * width);
+                //render_text(screen_text_data[i].a.p[j], font, -0.6, 1 - i * 0.1, 0.001, 0.001 * ratio);
+                render_text(screen_text_data[i].a.p[j],
+                            font,
+                            screen_text_data[i].x,
+                            screen_text_data[i].y - j * screen_text_data[i].line_spacing,
+                            screen_text_data[i].x_scale,
+                            screen_text_data[i].y_scale * ratio);
+            }
+        }
     }
 
 

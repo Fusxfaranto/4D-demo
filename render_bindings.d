@@ -15,6 +15,7 @@ extern (C) void cleanup();
 extern (C) int init();
 
 enum MAX_OBJECTS = 1000;
+enum MAX_TEXTS = 16;
 
 extern (C) extern __gshared GLFWwindow* w;
 extern (C) extern __gshared int width;
@@ -30,7 +31,17 @@ extern (C) extern __gshared int vertical_object_count;
 extern (C) extern __gshared float* view;
 extern (C) extern __gshared float* projection;
 extern (C) extern __gshared float* compass_projection;
-extern (C) extern __gshared immutable(char)*[] lines_to_render;
+
+struct screen_text_data_t
+{
+    immutable(char)*[] a;
+    float x;
+    float y;
+    float x_scale;
+    float y_scale;
+    float line_spacing;
+}
+extern (C) extern __gshared screen_text_data_t[MAX_TEXTS] screen_text_data;
 
 
 enum DisplayMode

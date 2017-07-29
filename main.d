@@ -46,9 +46,9 @@ enum TextDisplay
 }
 TextDisplay text_display;
 
-Mat4 test_rot_mat;
-Vec4[2] test_plane = [Vec4(0.5, 0.5, 0.5, 0.5), Vec4(-0.5, -0.5, 0.5, 0.5)];
-float test_angle = 0;
+//Mat4 test_rot_mat;
+//Vec4[2] test_plane = [Vec4(0.5, 0.5, 0.5, 0.5), Vec4(-0.5, -0.5, 0.5, 0.5)];
+//float test_angle = 0;
 
 
 
@@ -104,6 +104,16 @@ void main()
     //scene ~= tesseract(Vec4(0, 1, 1, 1));
     //scene ~= tesseract(Vec4(1, 1, 1, 1));
 
+
+    world.scene = [];
+    world.scene ~= tesseract!(false, solid_color_gen!(0.5, 0.5, 0.5))(Vec4(-30, -30, -30, -30), Vec4(60, 60, 60, 60));
+    world.scene ~= tesseract!(false, solid_color_gen!(0.6, 0.5, 0.1))(Vec4(-10, -2, -10, -10), Vec4(20, 2, 20, 20));
+    world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, 5, 0), Vec4(1, 3, 1, 1));
+    world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, -5, 0), Vec4(1, 3, 1, 1));
+    world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(-5, 0, 5, 0), Vec4(1, 3, 1, 1));
+    world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(-5, 0, -5, 0), Vec4(1, 3, 1, 1));
+    world.scene ~= tesseract!(true)(Vec4(0, 1.1, 0, 0.5), Vec4(1, 1, 1, 1));
+
     view_mat = look_at(Vec3(0, 0, 3), Vec3(0, 0, 0), Vec3(0, 1, 0));
     view = view_mat.data;
     projection = projection_mat.data;
@@ -124,7 +134,7 @@ void main()
     {
         fpss[t % fpss.length] = 1.0e9 / (TickDuration.currSystemTick() - last_time).nsecs();
         title_str = (sum(fpss[]) / fpss.length).to!string() ~ '\0';
-        title = title_str.ptr;
+        //title = title_str.ptr;
         last_time = TickDuration.currSystemTick();
 
         process_input();
@@ -154,33 +164,47 @@ void main()
 
         Vec4 char_right = cross_p(char_up, char_front, char_normal);
 
-        test_rot_mat = rot(test_plane[0], test_plane[1], test_angle);
+        //test_rot_mat = rot(test_plane[0], test_plane[1], test_angle);
+
+        screen_text_data[0].x = -1;
+        screen_text_data[0].y = 1;
+        screen_text_data[0].x_scale = 0.0005;
+        screen_text_data[0].y_scale = 0.0005;
+        screen_text_data[0].line_spacing = 0.1;
+        screen_text_data[0].a = [title_str.ptr];
+
+        screen_text_data[1].x = -0.6;
+        screen_text_data[1].y = 1;
+        screen_text_data[1].x_scale = 0.001;
+        screen_text_data[1].y_scale = 0.001;
+        screen_text_data[1].line_spacing = 0.1;
         final switch (text_display)
         {
         case TextDisplay.NONE:
-            lines_to_render = [];
+            screen_text_data[1].a = [];
             break;
 
         case TextDisplay.BLOCK:
-            lines_to_render = [
-                format("plane:  %6.3f, %6.3f, %6.3f, %6.3f\0",
-                       test_plane[0].x, test_plane[0].y, test_plane[0].z, test_plane[0].w).ptr,
-                format("        %6.3f, %6.3f, %6.3f, %6.3f\0",
-                       test_plane[1].x, test_plane[1].y, test_plane[1].z, test_plane[1].w).ptr,
-                format("angle:  %6.3f\0", (test_angle * 180.0 / PI) % 360).ptr,
-                format("matrix: %6.3f, %6.3f, %6.3f, %6.3f\0",
-                       test_rot_mat.xx, test_rot_mat.xy, test_rot_mat.xz, test_rot_mat.xw).ptr,
-                format("        %6.3f, %6.3f, %6.3f, %6.3f\0",
-                       test_rot_mat.yx, test_rot_mat.yy, test_rot_mat.yz, test_rot_mat.yw).ptr,
-                format("        %6.3f, %6.3f, %6.3f, %6.3f\0",
-                       test_rot_mat.zx, test_rot_mat.zy, test_rot_mat.zz, test_rot_mat.zw).ptr,
-                format("        %6.3f, %6.3f, %6.3f, %6.3f\0",
-                       test_rot_mat.wx, test_rot_mat.wy, test_rot_mat.wz, test_rot_mat.ww).ptr,
+            screen_text_data[1].a = [
+                "nope!"
+                // format("plane:  %6.3f, %6.3f, %6.3f, %6.3f\0",
+                //        test_plane[0].x, test_plane[0].y, test_plane[0].z, test_plane[0].w).ptr,
+                // format("        %6.3f, %6.3f, %6.3f, %6.3f\0",
+                //        test_plane[1].x, test_plane[1].y, test_plane[1].z, test_plane[1].w).ptr,
+                // format("angle:  %6.3f\0", (test_angle * 180.0 / PI) % 360).ptr,
+                // format("matrix: %6.3f, %6.3f, %6.3f, %6.3f\0",
+                //        test_rot_mat.xx, test_rot_mat.xy, test_rot_mat.xz, test_rot_mat.xw).ptr,
+                // format("        %6.3f, %6.3f, %6.3f, %6.3f\0",
+                //        test_rot_mat.yx, test_rot_mat.yy, test_rot_mat.yz, test_rot_mat.yw).ptr,
+                // format("        %6.3f, %6.3f, %6.3f, %6.3f\0",
+                //        test_rot_mat.zx, test_rot_mat.zy, test_rot_mat.zz, test_rot_mat.zw).ptr,
+                // format("        %6.3f, %6.3f, %6.3f, %6.3f\0",
+                //        test_rot_mat.wx, test_rot_mat.wy, test_rot_mat.wz, test_rot_mat.ww).ptr,
                 ];
             break;
 
         case TextDisplay.POS:
-            lines_to_render = [
+            screen_text_data[1].a = [
                 format("front:    %6.3f, %6.3f, %6.3f, %6.3f\0",
                        char_front.x, char_front.y, char_front.z, char_front.w).ptr,
                 format("up:       %6.3f, %6.3f, %6.3f, %6.3f\0",
@@ -194,15 +218,6 @@ void main()
                 ];
             break;
         }
-
-        world.scene = [];
-        world.scene ~= tesseract!(false, solid_color_gen!(0.5, 0.5, 0.5))(Vec4(-30, -30, -30, -30), Vec4(60, 60, 60, 60));
-        world.scene ~= tesseract!(false, solid_color_gen!(0.6, 0.5, 0.1))(Vec4(-10, -2, -10, -10), Vec4(20, 2, 20, 20));
-        world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, 5, 0), Vec4(1, 3, 1, 1));
-        world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, -5, 0), Vec4(1, 3, 1, 1));
-        world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(-5, 0, 5, 0), Vec4(1, 3, 1, 1));
-        world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(-5, 0, -5, 0), Vec4(1, 3, 1, 1));
-        world.scene ~= tesseract!(true)(Vec4(0, 1.1, 0, 0.5), Vec4(1, 1, 1, 1), test_rot_mat);
 
         Vec4 flat_front = (char_front - proj(char_front, global_up)).normalized();
         Vec4 flat_normal = (char_normal - proj(char_normal, global_up)).normalized();
@@ -576,14 +591,14 @@ void process_input()
 
 
 
-    if (get_key(GLFWKey.GLFW_KEY_T) == GLFWKeyStatus.GLFW_PRESS)
-    {
-        test_angle += rot_speed;
-    }
-    if (get_key(GLFWKey.GLFW_KEY_G) == GLFWKeyStatus.GLFW_PRESS)
-    {
-        test_angle -= rot_speed;
-    }
+    // if (get_key(GLFWKey.GLFW_KEY_T) == GLFWKeyStatus.GLFW_PRESS)
+    // {
+    //     test_angle += rot_speed;
+    // }
+    // if (get_key(GLFWKey.GLFW_KEY_G) == GLFWKeyStatus.GLFW_PRESS)
+    // {
+    //     test_angle -= rot_speed;
+    // }
 
 
 
@@ -607,3 +622,12 @@ void process_input()
         char_front = cross_p(right, char_up, char_normal).normalized();
     }
 }
+
+
+/*
+ * plan:
+ * - memory pool of tesseract chunks
+ * - load and render chunks inside surrounding 3-sphere (or similar)
+ * - block-based lighting
+ *
+ */
