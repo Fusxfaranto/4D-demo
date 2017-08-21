@@ -12,11 +12,26 @@ import matrix;
 import shapes;
 
 
+enum uint CHUNK_SIZE = 16;
+enum uint BLOCKS_IN_CHUNK = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
+
+enum BlockType
+{
+    NONE,
+    TEST,
+}
+
+struct Chunk
+{
+    Vec4 location;
+    BlockType[BLOCKS_IN_CHUNK] grid;
+}
 
 struct World
 {
     Vertex[4][] scene;
     Vertex[4][] character;
+
 }
 
 
