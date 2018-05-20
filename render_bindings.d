@@ -14,7 +14,6 @@ extern (C) int window_size_update();
 extern (C) void cleanup();
 extern (C) int init();
 
-enum MAX_OBJECTS = 32000;
 enum MAX_TEXTS = 16;
 
 extern (C) extern __gshared GLFWwindow* w;
@@ -24,10 +23,8 @@ extern (C) extern __gshared immutable(char)* title;
 extern (C) extern __gshared int display_mode;
 extern (C) extern __gshared float* compass_base;
 extern (C) extern __gshared float* compass;
-extern (C) extern __gshared float[][MAX_OBJECTS] objects;
-extern (C) extern __gshared int object_count;
-extern (C) extern __gshared float[][MAX_OBJECTS] vertical_objects;
-extern (C) extern __gshared int vertical_object_count;
+extern (C) extern __gshared float[] objects;
+extern (C) extern __gshared float[] vertical_objects;
 extern (C) extern __gshared float* view;
 extern (C) extern __gshared float* projection;
 extern (C) extern __gshared float* compass_projection;

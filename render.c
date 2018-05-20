@@ -36,10 +36,9 @@ GLuint fb_shader;
 GLuint fb_rectangle_vbo;
 GLuint fb_rectangle_vao;
 
-#define MAX_OBJECTS 32000
-GLuint VBOs[MAX_OBJECTS];
-GLuint VAOs[MAX_OBJECTS];
-FloatDArray objects[MAX_OBJECTS];
+GLuint main_VBO;
+GLuint main_VAO;
+FloatDArray objects;
 int object_count;
 //GLuint EBO;
 GLuint base_shader;
@@ -59,10 +58,9 @@ GLuint compass_shader;
 GLuint compass_fb;
 GLuint compass_tex;
 
-GLuint vertical_VBOs[MAX_OBJECTS];
-GLuint vertical_VAOs[MAX_OBJECTS];
-FloatDArray vertical_objects[MAX_OBJECTS];
-int vertical_object_count;
+GLuint vertical_VBO;
+GLuint vertical_VAO;
+FloatDArray vertical_objects;
 GLuint vertical_fb;
 GLuint vertical_tex;
 GLuint vertical_rbo;
@@ -86,11 +84,10 @@ struct
 void cleanup(void)
 {
     glfwDestroyWindow(w);
-    for (int i = 0; i < object_count; i++)
-    {
-        glDeleteVertexArrays(1, &VAOs[i]);
-        glDeleteBuffers(1, &VBOs[i]);
-    }
+    glDeleteVertexArrays(1, &main_VAO);
+    glDeleteBuffers(1, &main_VBO);
+    glDeleteVertexArrays(1, &vertical_VAO);
+    glDeleteBuffers(1, &vertical_VBO);
     //glDeleteBuffers(1, &EBO);
     glfwTerminate();
 
@@ -166,8 +163,8 @@ int init(void)
     /* glBindTexture(GL_TEXTURE_2D, 0); */
 
 
-    glGenBuffers(MAX_OBJECTS, VBOs);
-    glGenVertexArrays(MAX_OBJECTS, VAOs);
+    glGenBuffers(1, &main_VBO);
+    glGenVertexArrays(1, &main_VAO);
 
 
     glGenBuffers(1, &compass_VBO);
@@ -179,8 +176,8 @@ int init(void)
     glEnableVertexAttribArray(0);
 
 
-    glGenBuffers(MAX_OBJECTS, vertical_VBOs);
-    glGenVertexArrays(MAX_OBJECTS, vertical_VAOs);
+    glGenBuffers(1, &vertical_VBO);
+    glGenVertexArrays(1, &vertical_VAO);
 
 
     glGenBuffers(1, &fb_rectangle_vbo);
@@ -328,6 +325,28 @@ int window_size_update(void)
     return 0;
 }
 
+
+void render_objects(FloatDArray os, GLuint VAO, GLuint VBO)
+{
+    assert(os.l % 6 == 0);
+    
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glUniformMatrix4fv(view_loc, 1, GL_FALSE, view);
+
+    glBindVertexArray(VAO);
+
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, os.l * sizeof(float), os.p, GL_STREAM_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
+    glEnableVertexAttribArray(1);
+
+    glDrawArrays(GL_TRIANGLES, 0, os.l / 6);
+}
+
+
 void render(void)
 {
     glfwSetWindowTitle(w, title);
@@ -384,28 +403,13 @@ void render(void)
         assert(0);
     }
 
-    glBindFramebuffer(GL_FRAMEBUFFER, main_fb);
-    glClearColor(1.0, 243.0 / 255.0, 221.0 / 255.0, 1.0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
     glUseProgram(base_shader);
     glEnable(GL_DEPTH_TEST);
 
-    glUniformMatrix4fv(view_loc, 1, GL_FALSE, view);
+    glBindFramebuffer(GL_FRAMEBUFFER, main_fb);
+    glClearColor(1.0, 243.0 / 255.0, 221.0 / 255.0, 1.0);
 
-    for (int i = 0; i < object_count; i++)
-    {
-        glBindVertexArray(VAOs[i]);
-
-        glBindBuffer(GL_ARRAY_BUFFER, VBOs[i]);
-        glBufferData(GL_ARRAY_BUFFER, objects[i].l * sizeof(float), objects[i].p, GL_STREAM_DRAW);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)0);
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
-        glEnableVertexAttribArray(1);
-
-        glDrawArrays(GL_TRIANGLES, 0, objects[i].l / 6);
-    }
+    render_objects(objects, main_VAO, main_VBO);
 
     switch (display_mode)
     {
@@ -417,23 +421,8 @@ void render(void)
 
         glBindFramebuffer(GL_FRAMEBUFFER, vertical_fb);
         glClearColor(1, 1, 0, 1);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        glUniformMatrix4fv(view_loc, 1, GL_FALSE, view);
-
-        for (int i = 0; i < vertical_object_count; i++)
-        {
-            glBindVertexArray(vertical_VAOs[i]);
-
-            glBindBuffer(GL_ARRAY_BUFFER, vertical_VBOs[i]);
-            glBufferData(GL_ARRAY_BUFFER, vertical_objects[i].l * sizeof(float), vertical_objects[i].p, GL_STREAM_DRAW);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)0);
-            glEnableVertexAttribArray(0);
-            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
-            glEnableVertexAttribArray(1);
-
-            glDrawArrays(GL_TRIANGLES, 0, vertical_objects[i].l / 6);
-        }
+        
+        render_objects(vertical_objects, vertical_VAO, vertical_VBO);
         break;
 
     default:

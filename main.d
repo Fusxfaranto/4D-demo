@@ -238,9 +238,9 @@ void main()
 
         load_chunks(char_pos, 1.5f, world.loaded_chunks);
 
-        cross_section(world, objects, object_count,
+        cross_section(world, objects,
                       char_pos, char_up, char_front, char_normal, char_right);
-        cross_section(world, vertical_objects, vertical_object_count,
+        cross_section(world, vertical_objects,
                       char_pos, flat_normal, flat_front, global_up, flat_right);
 
         render();
@@ -263,11 +263,11 @@ void main()
 }
 
 
-void cross_section(ref World world, out float[][MAX_OBJECTS] objects, out int object_count,
+void cross_section(ref World world, ref float[] objects,
                    Vec4 base_pos, Vec4 up, Vec4 front, Vec4 normal, Vec4 right)
 {
-    // out param sets objects back to default
-    assert(object_count == 0);  // juuuuuuust in case
+    // reset contents without deallocating (in theory at least)
+    objects.length = 0;
 
     static ChunkPos[] cs_stack;
     static ChunkPos[] processed_cps;
@@ -280,8 +280,6 @@ void cross_section(ref World world, out float[][MAX_OBJECTS] objects, out int ob
 
     void process_cube(Vec4 pos, Vec4Basis dir)
     {
-        assert(object_count < MAX_OBJECTS);
-
         Vec4[8] corner_offsets;
         final switch (dir)
         {
@@ -375,38 +373,34 @@ void cross_section(ref World world, out float[][MAX_OBJECTS] objects, out int ob
 
         foreach (i, v; verts)
         {
+            //writeln(i, " ", verts);
             Vec4 diff = rel_pos[adjacent_corners[v][0]] - rel_pos[adjacent_corners[v][1]];
             float d = dot_p(normal, diff);
             Vec4 rel_intersection_point = rel_pos[adjacent_corners[v][0]] +
                 diff * (-dot_p(rel_pos[adjacent_corners[v][0]], normal) / d);
 
-            if (objects[object_count].length >= 3 * 6)
+            if (i >= 3)
             {
-                if (false)
-                {
-                    objects[object_count] ~= objects[object_count][($ - 3 * 6)..($ - 2 * 6)];
-                    objects[object_count] ~= objects[object_count][($ - 2 * 6)..($ - 1 * 6)];
-                }
-                else
-                {
-                    objects[object_count] ~= objects[object_count][($ - 2 * 6)..($ - 1 * 6)];
-                    objects[object_count] ~= objects[object_count][($ - 2 * 6)..($ - 1 * 6)];
-                }
+                objects ~= objects[($ - 2 * 6)..($ - 1 * 6)];
+                objects ~= objects[($ - 2 * 6)..($ - 1 * 6)];
             }
 
-            objects[object_count] ~= [
+            objects ~= [
                 dot_p(right, rel_intersection_point),
                 dot_p(up, rel_intersection_point),
                 dot_p(front, rel_intersection_point),
-                0.1, 0.8 * (objects[object_count].length >= 3 * 6), 0.7
+                0.1, 0.8 * (i >= 3), 0.7
                 ];
         }
 
-        object_count += !verts.empty();
+        //writeln(objects[($ - ((verts.length - 2) * 3) * 6)..$]);
+
+        assert(objects.length % 3 == 0);
     }
 
     void process_chunk(ref Chunk c, ChunkPos cp)
     {
+        //writeln("processing ", cp);
         processed_cps ~= cp;
         c.status = ChunkStatus.PROCESSED;
 
@@ -505,13 +499,13 @@ void cross_section(ref World world, out float[][MAX_OBJECTS] objects, out int ob
 
                         if (verts_added == 3)
                         {
-                            objects[object_count] ~= objects[object_count][(1 * 6)..(2 * 6)];
-                            objects[object_count] ~= objects[object_count][(2 * 6)..(3 * 6)];
+                            objects ~= objects[($ - 2 * 6)..($ - 1 * 6)];
+                            objects ~= objects[($ - 2 * 6)..($ - 1 * 6)];
                             verts_added += 2;
                         }
 
                         // http://stackoverflow.com/questions/23472048/projecting-3d-points-to-2d-plane i guess
-                        objects[object_count] ~= [
+                        objects ~= [
                             dot_p(right, rel_intersection_point),
                             dot_p(up, rel_intersection_point),
                             dot_p(front, rel_intersection_point),
@@ -522,7 +516,6 @@ void cross_section(ref World world, out float[][MAX_OBJECTS] objects, out int ob
                 }
             }
 
-            object_count += !!verts_added;
             assert(verts_added == 0 || verts_added == 3 || verts_added == 6);
         }
     }
