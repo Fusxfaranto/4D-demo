@@ -36,7 +36,7 @@ GLuint fb_shader;
 GLuint fb_rectangle_vbo;
 GLuint fb_rectangle_vao;
 
-#define MAX_OBJECTS 1000
+#define MAX_OBJECTS 32000
 GLuint VBOs[MAX_OBJECTS];
 GLuint VAOs[MAX_OBJECTS];
 FloatDArray objects[MAX_OBJECTS];
@@ -100,7 +100,7 @@ void cleanup(void)
 static void error_callback(int error, const char *description)
 {
     fputs(description, stderr);
-    error++; // silence warning
+    (void)error;
 }
 
 int init(void)

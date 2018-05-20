@@ -15,13 +15,14 @@ OBJS := $(C_OBJS) $(D_OBJS)
 
 #CC := ./gdc/x86_64-pc-linux-gnu/bin/x86_64-linux-gnu-gcc
 #DC := ./gdc/x86_64-pc-linux-gnu/bin/x86_64-linux-gnu-gdc
-DC := ./ldc/build/bin/ldc2
+#DC := ./ldc/build/bin/ldc2
+DC := ldc2
 #DC := dmd
 
 CFLAGS := -m64 -g -c -std=c11 -pedantic -Wall -Werror -Wno-error=unused-variable #-I/usr/include/freetype2/ #-Iftgl/src/
 DFLAGS := -m64 -g -c #-profile
 #LDFLAGS := -Llib -lm -lSOIL -lGLEW -lglfw -lGL
-LDFLAGS := -L-Llib -L-lm -L-lftgl -L-lSOIL -L-lGLEW -L-lglfw -L-lGL
+LDFLAGS := -L-Llib -L-lm -L-lSOIL -L-lGLEW -L-lglfw -L-lGL
 
 
 .PHONY: all tut clean distclean
@@ -30,7 +31,7 @@ all: $(NAME)
 
 $(NAME): $(OBJS)
 #	$(DC) $(OBJS) $(LDFLAGS) -o $(NAME)
-	$(DC) $(OBJS) $(LDFLAGS) -of=$(NAME)
+	$(DC) $(OBJS) $(LDFLAGS) -of$(NAME)
 
 $(D_OBJS): $(D_SRCS)
 	$(DC) $(D_SRCS) $(DFLAGS)

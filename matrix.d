@@ -1,7 +1,8 @@
 import std.stdio : writeln;
-import std.format : format;
 import std.conv : to;
 import std.math : PI, abs, sin, cos, tan, sqrt;
+
+import util : format;
 
 
 float deg_to_rad(float n)
@@ -119,6 +120,14 @@ struct Vec4
         this = mixin("this" ~ op ~ "b");
         return this;
     }
+}
+
+enum Vec4Basis
+{
+    X,
+    Y,
+    Z,
+    W,
 }
 
 Vec4 cross_p()(auto ref in Vec4 a, auto ref in Vec4 b, auto ref in Vec4 c) pure

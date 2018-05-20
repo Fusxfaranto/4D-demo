@@ -14,7 +14,7 @@ extern (C) int window_size_update();
 extern (C) void cleanup();
 extern (C) int init();
 
-enum MAX_OBJECTS = 1000;
+enum MAX_OBJECTS = 32000;
 enum MAX_TEXTS = 16;
 
 extern (C) extern __gshared GLFWwindow* w;

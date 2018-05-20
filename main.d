@@ -5,33 +5,21 @@ import std.math : PI, sin, cos, acos, sgn;
 import std.datetime : TickDuration;
 import std.array : array;
 import std.algorithm : sum, map;
+import std.typecons : Tuple, tuple;
 
 import util;
 import render_bindings;
 import matrix;
 import shapes;
+import chunk;
 
-
-enum uint CHUNK_SIZE = 16;
-enum uint BLOCKS_IN_CHUNK = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
-
-enum BlockType
-{
-    NONE,
-    TEST,
-}
-
-struct Chunk
-{
-    Vec4 location;
-    BlockType[BLOCKS_IN_CHUNK] grid;
-}
 
 struct World
 {
     Vertex[4][] scene;
     Vertex[4][] character;
 
+    Chunk[ChunkPos] loaded_chunks;
 }
 
 
@@ -248,6 +236,8 @@ void main()
         Vec3 compass_ = Vec3(-flat_front.x, flat_front.w, flat_front.z) + compass_base_;
         compass = compass_.data();
 
+        load_chunks(char_pos, 1.5f, world.loaded_chunks);
+
         cross_section(world, objects, object_count,
                       char_pos, char_up, char_front, char_normal, char_right);
         cross_section(world, vertical_objects, vertical_object_count,
@@ -273,11 +263,219 @@ void main()
 }
 
 
-void cross_section(ref in World world, out float[][MAX_OBJECTS] objects, out int object_count,
-                   Vec4 pos, Vec4 up, Vec4 front, Vec4 normal, Vec4 right)
+void cross_section(ref World world, out float[][MAX_OBJECTS] objects, out int object_count,
+                   Vec4 base_pos, Vec4 up, Vec4 front, Vec4 normal, Vec4 right)
 {
     // out param sets objects back to default
     assert(object_count == 0);  // juuuuuuust in case
+
+    static ChunkPos[] cs_stack;
+    static ChunkPos[] processed_cps;
+
+    assert(processed_cps.length == 0);
+
+    ChunkPos center_cp = coords_to_chunkpos(base_pos);
+    cs_stack.length = 1;
+    cs_stack[0] = center_cp;
+
+    void process_cube(Vec4 pos, Vec4Basis dir)
+    {
+        assert(object_count < MAX_OBJECTS);
+
+        Vec4[8] corner_offsets;
+        final switch (dir)
+        {
+        case Vec4Basis.X:
+            corner_offsets = [
+                Vec4(0, 0, 0, 0),
+                Vec4(0, 1, 0, 0),
+                Vec4(0, 0, 1, 0),
+                Vec4(0, 0, 0, 1),
+                Vec4(0, 1, 1, 0),
+                Vec4(0, 1, 0, 1),
+                Vec4(0, 0, 1, 1),
+                Vec4(0, 1, 1, 1),
+                ];
+            break;
+
+        case Vec4Basis.Y:
+            corner_offsets = [
+                Vec4(0, 0, 0, 0),
+                Vec4(1, 0, 0, 0),
+                Vec4(0, 0, 1, 0),
+                Vec4(0, 0, 0, 1),
+                Vec4(1, 0, 1, 0),
+                Vec4(1, 0, 0, 1),
+                Vec4(0, 0, 1, 1),
+                Vec4(1, 0, 1, 1),
+                ];
+            break;
+
+        case Vec4Basis.Z:
+            corner_offsets = [
+                Vec4(0, 0, 0, 0),
+                Vec4(1, 0, 0, 0),
+                Vec4(0, 1, 0, 0),
+                Vec4(0, 0, 0, 1),
+                Vec4(1, 1, 0, 0),
+                Vec4(1, 0, 0, 1),
+                Vec4(0, 1, 0, 1),
+                Vec4(1, 1, 0, 1),
+                ];
+            break;
+
+        case Vec4Basis.W:
+            corner_offsets = [
+                Vec4(0, 0, 0, 0),
+                Vec4(1, 0, 0, 0),
+                Vec4(0, 1, 0, 0),
+                Vec4(0, 0, 1, 0),
+                Vec4(1, 1, 0, 0),
+                Vec4(1, 0, 1, 0),
+                Vec4(0, 1, 1, 0),
+                Vec4(1, 1, 1, 0),
+                ];
+            break;
+        }
+
+        enum Tuple!(int, int)[12] adjacent_corners = [
+            tuple(0, 1),
+            tuple(0, 2),
+            tuple(0, 3),
+            tuple(1, 4),
+            tuple(1, 5),
+            tuple(2, 4),
+            tuple(2, 6),
+            tuple(3, 5),
+            tuple(3, 6),
+            tuple(4, 7),
+            tuple(5, 7),
+            tuple(6, 7),
+            ];
+
+        Vec4[8] rel_pos;
+        bool[8] pos_side;
+        for (int i = 0; i < 8; i++)
+        {
+            rel_pos[i] = corner_offsets[i] + pos - base_pos;
+            pos_side[i] = dot_p(rel_pos[i], normal) > 0;
+        }
+
+        static size_t[] verts;
+        verts.length = 0;
+
+        foreach (i, t; adjacent_corners)
+        {
+            if (pos_side[t[0]] != pos_side[t[1]])
+            {
+                verts ~= i;
+                //writeln(t);
+            }
+        }
+
+        foreach (i, v; verts)
+        {
+            Vec4 diff = rel_pos[adjacent_corners[v][0]] - rel_pos[adjacent_corners[v][1]];
+            float d = dot_p(normal, diff);
+            Vec4 rel_intersection_point = rel_pos[adjacent_corners[v][0]] +
+                diff * (-dot_p(rel_pos[adjacent_corners[v][0]], normal) / d);
+
+            if (objects[object_count].length >= 3 * 6)
+            {
+                if (false)
+                {
+                    objects[object_count] ~= objects[object_count][($ - 3 * 6)..($ - 2 * 6)];
+                    objects[object_count] ~= objects[object_count][($ - 2 * 6)..($ - 1 * 6)];
+                }
+                else
+                {
+                    objects[object_count] ~= objects[object_count][($ - 2 * 6)..($ - 1 * 6)];
+                    objects[object_count] ~= objects[object_count][($ - 2 * 6)..($ - 1 * 6)];
+                }
+            }
+
+            objects[object_count] ~= [
+                dot_p(right, rel_intersection_point),
+                dot_p(up, rel_intersection_point),
+                dot_p(front, rel_intersection_point),
+                0.1, 0.8 * (objects[object_count].length >= 3 * 6), 0.7
+                ];
+        }
+
+        object_count += !verts.empty();
+    }
+
+    void process_chunk(ref Chunk c, ChunkPos cp)
+    {
+        processed_cps ~= cp;
+        c.status = ChunkStatus.PROCESSED;
+
+        foreach (x; 0..CHUNK_SIZE)
+        {
+            foreach (y; 0..CHUNK_SIZE)
+            {
+                foreach (z; 0..CHUNK_SIZE)
+                {
+                    foreach (w; 0..CHUNK_SIZE)
+                    {
+                        if (c.grid[x][y][z][w] != BlockType.NONE)
+                        {
+                            Vec4 pos = cp.to_vec4() + Vec4(x, y, z, w);
+
+                            process_cube(pos + Vec4(0, 0, 0, 0), Vec4Basis.X);
+                            process_cube(pos + Vec4(0, 0, 0, 0), Vec4Basis.Y);
+                            process_cube(pos + Vec4(0, 0, 0, 0), Vec4Basis.Z);
+                            process_cube(pos + Vec4(0, 0, 0, 0), Vec4Basis.W);
+                            process_cube(pos + Vec4(1, 0, 0, 0), Vec4Basis.X);
+                            process_cube(pos + Vec4(0, 1, 0, 0), Vec4Basis.Y);
+                            process_cube(pos + Vec4(0, 0, 1, 0), Vec4Basis.Z);
+                            process_cube(pos + Vec4(0, 0, 0, 1), Vec4Basis.W);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    assert(center_cp in world.loaded_chunks);
+    process_chunk(world.loaded_chunks[center_cp], center_cp);
+
+    while (!cs_stack.empty())
+    {
+        ChunkPos cp = cs_stack.back();
+        cs_stack.popBack();
+
+        foreach (new_cp; [
+                     cp.shift!"x"(1),
+                     cp.shift!"y"(1),
+                     cp.shift!"z"(1),
+                     cp.shift!"w"(1),
+                     cp.shift!"x"(-1),
+                     cp.shift!"y"(-1),
+                     cp.shift!"z"(-1),
+                     cp.shift!"w"(-1),
+                     ])
+        {
+            // TODO if intersects hplane
+
+            Chunk* p = new_cp in world.loaded_chunks;
+            if (p && p.status == ChunkStatus.NOT_PROCESSED)
+            {
+                cs_stack ~= new_cp;
+                process_chunk(*p, new_cp);
+            }
+        }
+    }
+
+    //writeln(processed_cps);
+    foreach (cp; processed_cps)
+    {
+        world.loaded_chunks[cp].status = ChunkStatus.NOT_PROCESSED;
+    }
+    processed_cps.length = 0;
+
+    //writeln(objects[0..10]);
+
 
     void run(ref in Vertex[4][] tets)
     {
@@ -287,7 +485,7 @@ void cross_section(ref in World world, out float[][MAX_OBJECTS] objects, out int
             bool[4] pos_side;
             for (int i = 0; i < 4; i++)
             {
-                rel_pos[i] = tet[i].loc - pos;
+                rel_pos[i] = tet[i].loc - base_pos;
                 pos_side[i] = dot_p(rel_pos[i], normal) > 0;
             }
 
@@ -303,7 +501,7 @@ void cross_section(ref in World world, out float[][MAX_OBJECTS] objects, out int
                         // this would fire sometimes, but i don't think it's actually important to ensure
                         //assert(abs(d) > 1e-6);
                         Vec4 rel_intersection_point = tet[i].loc +
-                            diff * (-dot_p(rel_pos[i], normal) / d) - char_pos;
+                            diff * (-dot_p(rel_pos[i], normal) / d) - base_pos;
 
                         if (verts_added == 3)
                         {
