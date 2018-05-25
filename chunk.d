@@ -7,7 +7,7 @@ import std.math : sqrt, floor;
 import matrix;
 
 
-enum uint CHUNK_SIZE = 16;
+enum uint CHUNK_SIZE = 8;
 enum uint BLOCKS_IN_CHUNK = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 
 enum BlockType

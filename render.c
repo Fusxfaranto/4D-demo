@@ -478,7 +478,11 @@ void render(void)
 
 
     glfwSwapBuffers(w);
+}
 
+
+void wait_for_next_frame(void)
+{
     // TODO: bleuuuurggh
     const double frame_time = 1.0 / 59.95;
     int i = 0;

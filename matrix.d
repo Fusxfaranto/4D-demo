@@ -1,6 +1,7 @@
 import std.stdio : writeln;
 import std.conv : to;
-import std.math : PI, abs, sin, cos, tan, sqrt;
+import std.math : PI, abs, sin, cos, tan, sqrt, acos, isNaN;
+import std.algorithm : min;
 
 import util : format;
 
@@ -40,6 +41,11 @@ struct Vec3
     Vec3 opBinaryRight(string op)(float a) if (op == "*")
     {
         return Vec3(a * x, a * y, a * z);
+    }
+
+    Vec4 to_vec4() const pure
+    {
+        return Vec4(x, y, z, 0);
     }
 }
 
@@ -120,6 +126,11 @@ struct Vec4
         this = mixin("this" ~ op ~ "b");
         return this;
     }
+
+    bool is_nan() pure
+    {
+        return isNaN(this.x) || isNaN(this.y) || isNaN(this.z) || isNaN(this.w);
+    }
 }
 
 enum Vec4Basis
@@ -128,6 +139,48 @@ enum Vec4Basis
     Y,
     Z,
     W,
+}
+
+enum Vec4BasisSigned
+{
+    X,
+    Y,
+    Z,
+    W,
+    nX,
+    nY,
+    nZ,
+    nW,
+}
+
+Vec4 from_basis(Vec4BasisSigned b)
+{
+    final switch (b)
+    {
+        case Vec4BasisSigned.X:
+            return Vec4(1, 0, 0, 0);
+
+        case Vec4BasisSigned.nX:
+            return Vec4(-1, 0, 0, 0);
+
+        case Vec4BasisSigned.Y:
+            return Vec4(0, 1, 0, 0);
+
+        case Vec4BasisSigned.nY:
+            return Vec4(0, -1, 0, 0);
+
+        case Vec4BasisSigned.Z:
+            return Vec4(0, 0, 1, 0);
+
+        case Vec4BasisSigned.nZ:
+            return Vec4(0, 0, -1, 0);
+
+        case Vec4BasisSigned.W:
+            return Vec4(0, 0, 0, 1);
+
+        case Vec4BasisSigned.nW:
+            return Vec4(0, 0, 0, -1);
+    }
 }
 
 Vec4 cross_p()(auto ref in Vec4 a, auto ref in Vec4 b, auto ref in Vec4 c) pure
@@ -180,6 +233,20 @@ Vec4 normalized()(auto ref in Vec4 a) pure
 {
     immutable float m = a.magnitude();
     return Vec4(a.x / m, a.y / m, a.z / m, a.w / m);
+}
+
+float angle_between()(auto ref in Vec4 a, auto ref in Vec4 b, auto ref in Vec4 pa, auto ref in Vec4 pb) pure
+{
+    // TODO acos apparently has precision issues at boundaries?
+    float t = acos(min(dot_p(normalized(a), normalized(b)), 1));
+    if (dot_p(cross_p(a, b, pa), pb) > 0)
+    {
+        return t;
+    }
+    else
+    {
+        return -t;
+    }
 }
 
 

@@ -2,7 +2,7 @@
 import std.stdio : writeln;
 import std.conv : to;
 import std.math : PI, sin, cos, acos, sgn;
-import std.datetime : TickDuration;
+import std.datetime : TickDuration, StopWatch;
 import std.array : array;
 import std.algorithm : sum, map;
 import std.typecons : Tuple, tuple;
@@ -39,6 +39,9 @@ Mat4 view_mat, projection_mat, compass_projection_mat;
 
 bool char_enabled = true;
 bool force_window_size_update = false;
+bool cube_culling = true;
+
+debug(prof) StopWatch sw;
 
 
 enum TextDisplay
@@ -48,6 +51,7 @@ enum TextDisplay
     POS,
 }
 TextDisplay text_display;
+string[] scratch_strings;
 
 //Mat4 test_rot_mat;
 //Vec4[2] test_plane = [Vec4(0.5, 0.5, 0.5, 0.5), Vec4(-0.5, -0.5, 0.5, 0.5)];
@@ -133,14 +137,20 @@ void main()
     float last_fov = fov;
     TickDuration last_time;
     float[30] fpss;
+    debug(prof) sw.start();
+
     while (!glfwWindowShouldClose(w))
     {
+        debug(prof) writeln("tick start");
+        debug(prof) sw.reset();
+
         fpss[t % fpss.length] = 1.0e9 / (TickDuration.currSystemTick() - last_time).nsecs();
         title_str = (sum(fpss[]) / fpss.length).to!string() ~ '\0';
         //title = title_str.ptr;
         last_time = TickDuration.currSystemTick();
 
         process_input();
+        debug(prof) profile_checkpoint(__LINE__, sw);
 
         if (force_window_size_update || last_width != width || last_height != height || last_fov != fov)
         {
@@ -164,6 +174,7 @@ void main()
 
             handle_errors!window_size_update();
         }
+        debug(prof) profile_checkpoint(__LINE__, sw);
 
         Vec4 char_right = cross_p(char_up, char_front, char_normal);
 
@@ -188,22 +199,7 @@ void main()
             break;
 
         case TextDisplay.BLOCK:
-            screen_text_data[1].a = [
-                "nope!"
-                // format("plane:  %6.3f, %6.3f, %6.3f, %6.3f\0",
-                //        test_plane[0].x, test_plane[0].y, test_plane[0].z, test_plane[0].w).ptr,
-                // format("        %6.3f, %6.3f, %6.3f, %6.3f\0",
-                //        test_plane[1].x, test_plane[1].y, test_plane[1].z, test_plane[1].w).ptr,
-                // format("angle:  %6.3f\0", (test_angle * 180.0 / PI) % 360).ptr,
-                // format("matrix: %6.3f, %6.3f, %6.3f, %6.3f\0",
-                //        test_rot_mat.xx, test_rot_mat.xy, test_rot_mat.xz, test_rot_mat.xw).ptr,
-                // format("        %6.3f, %6.3f, %6.3f, %6.3f\0",
-                //        test_rot_mat.yx, test_rot_mat.yy, test_rot_mat.yz, test_rot_mat.yw).ptr,
-                // format("        %6.3f, %6.3f, %6.3f, %6.3f\0",
-                //        test_rot_mat.zx, test_rot_mat.zy, test_rot_mat.zz, test_rot_mat.zw).ptr,
-                // format("        %6.3f, %6.3f, %6.3f, %6.3f\0",
-                //        test_rot_mat.wx, test_rot_mat.wy, test_rot_mat.wz, test_rot_mat.ww).ptr,
-                ];
+            screen_text_data[1].a = map!"a.toStringz"(scratch_strings).array;
             break;
 
         case TextDisplay.POS:
@@ -221,6 +217,8 @@ void main()
                 ];
             break;
         }
+        scratch_strings.length = 0;
+        debug(prof) profile_checkpoint(__LINE__, sw);
 
         Vec4 flat_front = (char_front - proj(char_front, global_up)).normalized();
         Vec4 flat_normal = (char_normal - proj(char_normal, global_up)).normalized();
@@ -235,15 +233,22 @@ void main()
 
         Vec3 compass_ = Vec3(-flat_front.x, flat_front.w, flat_front.z) + compass_base_;
         compass = compass_.data();
+        debug(prof) profile_checkpoint(__LINE__, sw);
 
         load_chunks(char_pos, 1.5f, world.loaded_chunks);
+        debug(prof) profile_checkpoint(__LINE__, sw);
 
-        cross_section(world, objects,
-                      char_pos, char_up, char_front, char_normal, char_right);
         cross_section(world, vertical_objects,
                       char_pos, flat_normal, flat_front, global_up, flat_right);
+        debug(prof) profile_checkpoint(__LINE__, sw);
+
+        scratch_strings.length = 0;
+        cross_section(world, objects,
+                      char_pos, char_up, char_front, char_normal, char_right);
+        debug(prof) profile_checkpoint(__LINE__, sw);
 
         render();
+        debug(prof) profile_checkpoint(__LINE__, sw);
 
         for (;;)
         {
@@ -257,6 +262,9 @@ void main()
                 writeln("OpenGL error: ", err);
             }
         }
+
+        wait_for_next_frame();
+        debug(prof) profile_checkpoint(__LINE__, sw);
 
         t++;
     }
@@ -278,12 +286,17 @@ void cross_section(ref World world, ref float[] objects,
     cs_stack.length = 1;
     cs_stack[0] = center_cp;
 
-    void process_cube(Vec4 pos, Vec4Basis dir)
+    void process_cube(Vec4 pos, Vec4BasisSigned dir)
     {
+        if (cube_culling && dot_p(pos - base_pos, dir.from_basis()) > 0)
+        {
+            return;
+        }
+
         Vec4[8] corner_offsets;
         final switch (dir)
         {
-        case Vec4Basis.X:
+        case Vec4BasisSigned.X: case Vec4BasisSigned.nX:
             corner_offsets = [
                 Vec4(0, 0, 0, 0),
                 Vec4(0, 1, 0, 0),
@@ -296,7 +309,7 @@ void cross_section(ref World world, ref float[] objects,
                 ];
             break;
 
-        case Vec4Basis.Y:
+        case Vec4BasisSigned.Y: case Vec4BasisSigned.nY:
             corner_offsets = [
                 Vec4(0, 0, 0, 0),
                 Vec4(1, 0, 0, 0),
@@ -309,7 +322,7 @@ void cross_section(ref World world, ref float[] objects,
                 ];
             break;
 
-        case Vec4Basis.Z:
+        case Vec4BasisSigned.Z: case Vec4BasisSigned.nZ:
             corner_offsets = [
                 Vec4(0, 0, 0, 0),
                 Vec4(1, 0, 0, 0),
@@ -322,7 +335,7 @@ void cross_section(ref World world, ref float[] objects,
                 ];
             break;
 
-        case Vec4Basis.W:
+        case Vec4BasisSigned.W: case Vec4BasisSigned.nW:
             corner_offsets = [
                 Vec4(0, 0, 0, 0),
                 Vec4(1, 0, 0, 0),
@@ -333,6 +346,42 @@ void cross_section(ref World world, ref float[] objects,
                 Vec4(0, 1, 1, 0),
                 Vec4(1, 1, 1, 0),
                 ];
+            break;
+        }
+
+        float[3] color;
+        final switch (dir)
+        {
+        case Vec4BasisSigned.X:
+            color = [.0, .8, .0];
+            break;
+
+        case Vec4BasisSigned.nX:
+            color = [.8, .0, .0];
+            break;
+
+        case Vec4BasisSigned.Y:
+            color = [.0, .0, .8];
+            break;
+
+        case Vec4BasisSigned.nY:
+            color = [.0, .8, .8];
+            break;
+
+        case Vec4BasisSigned.Z:
+            color = [.8, .0, .8];
+            break;
+
+        case Vec4BasisSigned.nZ:
+            color = [.8, .8, .0];
+            break;
+
+        case Vec4BasisSigned.W:
+            color = [.2, .2, .2];
+            break;
+
+        case Vec4BasisSigned.nW:
+            color = [.7, .7, .7];
             break;
         }
 
@@ -371,6 +420,53 @@ void cross_section(ref World world, ref float[] objects,
             }
         }
 
+        // i don't like this but it'll have to do for now
+        // if this looks like it's here to stay, at least replace it with a trie or something
+        if (verts.length >= 5)
+        {
+            if (verts.length == 6)
+            {
+                if (verts == [3, 4, 5, 6, 7, 8])
+                {
+                    swap(verts[3], verts[4]);
+                }
+            }
+            else
+            {
+                if (verts == [0, 5, 6, 7, 8])
+                {
+                    swap(verts[0], verts[1]);
+                }
+                else if (verts == [0, 1, 6, 7, 11])
+                {
+                    swap(verts[0], verts[1]);
+                }
+                else if (verts == [3, 5, 6, 8, 10])
+                {
+                    swap(verts[0], verts[1]);
+                    swap(verts[1], verts[2]);
+                }
+                else if (verts == [1, 2, 4, 5, 9])
+                {
+                    swap(verts[0], verts[1]);
+                }
+                else if (verts == [4, 6, 7, 8, 9])
+                {
+                    swap(verts[0], verts[3]);
+                    swap(verts[3], verts[4]);
+                }
+                else if (verts == [2, 3, 4, 5, 6])
+                {
+                    swap(verts[0], verts[2]);
+                }
+                else if (verts == [1, 3, 4, 7, 8])
+                {
+                    swap(verts[0], verts[1]);
+                    swap(verts[3], verts[4]);
+                }
+            }
+        }
+
         foreach (i, v; verts)
         {
             //writeln(i, " ", verts);
@@ -389,9 +485,14 @@ void cross_section(ref World world, ref float[] objects,
                 dot_p(right, rel_intersection_point),
                 dot_p(up, rel_intersection_point),
                 dot_p(front, rel_intersection_point),
-                0.1, 0.8 * (i >= 3), 0.7
+                color[0], color[1], color[2]
                 ];
         }
+        if (verts.length >= 1)
+        {
+            scratch_strings ~= verts.to!string();
+        }
+        //writeln(verts);
 
         //writeln(objects[($ - ((verts.length - 2) * 3) * 6)..$]);
 
@@ -412,18 +513,22 @@ void cross_section(ref World world, ref float[] objects,
                 {
                     foreach (w; 0..CHUNK_SIZE)
                     {
+                        // TODO: first check if block is viable to have any intersection at all, and only then check each cube
+
                         if (c.grid[x][y][z][w] != BlockType.NONE)
                         {
+                            debug(prof) profile_checkpoint(__LINE__, sw);
                             Vec4 pos = cp.to_vec4() + Vec4(x, y, z, w);
 
-                            process_cube(pos + Vec4(0, 0, 0, 0), Vec4Basis.X);
-                            process_cube(pos + Vec4(0, 0, 0, 0), Vec4Basis.Y);
-                            process_cube(pos + Vec4(0, 0, 0, 0), Vec4Basis.Z);
-                            process_cube(pos + Vec4(0, 0, 0, 0), Vec4Basis.W);
-                            process_cube(pos + Vec4(1, 0, 0, 0), Vec4Basis.X);
-                            process_cube(pos + Vec4(0, 1, 0, 0), Vec4Basis.Y);
-                            process_cube(pos + Vec4(0, 0, 1, 0), Vec4Basis.Z);
-                            process_cube(pos + Vec4(0, 0, 0, 1), Vec4Basis.W);
+                            process_cube(pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.nX);
+                            process_cube(pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.nY);
+                            process_cube(pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.nZ);
+                            process_cube(pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.nW);
+                            process_cube(pos + Vec4(1, 0, 0, 0), Vec4BasisSigned.X);
+                            process_cube(pos + Vec4(0, 1, 0, 0), Vec4BasisSigned.Y);
+                            process_cube(pos + Vec4(0, 0, 1, 0), Vec4BasisSigned.Z);
+                            process_cube(pos + Vec4(0, 0, 0, 1), Vec4BasisSigned.W);
+                            debug(prof) profile_checkpoint(__LINE__, sw);
                         }
                     }
                 }
@@ -469,6 +574,7 @@ void cross_section(ref World world, ref float[] objects,
     processed_cps.length = 0;
 
     //writeln(objects[0..10]);
+    debug(prof) profile_checkpoint(__LINE__, sw);
 
 
     void run(ref in Vertex[4][] tets)
@@ -525,6 +631,7 @@ void cross_section(ref World world, ref float[] objects,
     {
         run(world.character);
     }
+    debug(prof) profile_checkpoint(__LINE__, sw);
 }
 
 
@@ -592,6 +699,12 @@ extern (C) void key_callback(GLFWwindow* window, int key, int scancode, int acti
     case GLFWKey.GLFW_KEY_BACKSPACE:
     {
         char_enabled ^= true;
+        break;
+    }
+
+    case GLFWKey.GLFW_KEY_C:
+    {
+        cube_culling ^= true;
         break;
     }
 

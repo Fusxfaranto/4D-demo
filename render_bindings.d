@@ -11,6 +11,7 @@ extern (C) int glGetError();
 
 extern (C) void render();
 extern (C) int window_size_update();
+extern (C) void wait_for_next_frame();
 extern (C) void cleanup();
 extern (C) int init();
 
