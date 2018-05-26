@@ -97,6 +97,11 @@ struct Vec4
         return sqrt(x * x + y * y + z * z + w * w);
     }
 
+    float l1_norm() const pure
+    {
+        return abs(x) + abs(y) + abs(z) + abs(w);
+    }
+
     void normalize()
     {
         float m = magnitude();
@@ -147,10 +152,10 @@ enum Vec4BasisSigned
     Y,
     Z,
     W,
-    nX,
-    nY,
-    nZ,
-    nW,
+    NX,
+    NY,
+    NZ,
+    NW,
 }
 
 Vec4 from_basis(Vec4BasisSigned b)
@@ -160,25 +165,25 @@ Vec4 from_basis(Vec4BasisSigned b)
         case Vec4BasisSigned.X:
             return Vec4(1, 0, 0, 0);
 
-        case Vec4BasisSigned.nX:
+        case Vec4BasisSigned.NX:
             return Vec4(-1, 0, 0, 0);
 
         case Vec4BasisSigned.Y:
             return Vec4(0, 1, 0, 0);
 
-        case Vec4BasisSigned.nY:
+        case Vec4BasisSigned.NY:
             return Vec4(0, -1, 0, 0);
 
         case Vec4BasisSigned.Z:
             return Vec4(0, 0, 1, 0);
 
-        case Vec4BasisSigned.nZ:
+        case Vec4BasisSigned.NZ:
             return Vec4(0, 0, -1, 0);
 
         case Vec4BasisSigned.W:
             return Vec4(0, 0, 0, 1);
 
-        case Vec4BasisSigned.nW:
+        case Vec4BasisSigned.NW:
             return Vec4(0, 0, 0, -1);
     }
 }

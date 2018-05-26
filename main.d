@@ -235,16 +235,17 @@ void main()
         compass = compass_.data();
         debug(prof) profile_checkpoint(__LINE__, sw);
 
-        load_chunks(char_pos, 1.5f, world.loaded_chunks);
-        scratch_strings ~= to!string(world.loaded_chunks.length);
+        float render_radius = 25;
+        load_chunks(char_pos, cast(int)(render_radius / CHUNK_SIZE) + 1, world.loaded_chunks);
+        //scratch_strings ~= to!string(world.loaded_chunks.length);
         debug(prof) profile_checkpoint(__LINE__, sw);
 
-        cross_section(world, vertical_objects,
+        cross_section(world, vertical_objects, render_radius,
                       char_pos, flat_normal, flat_front, global_up, flat_right);
         debug(prof) profile_checkpoint(__LINE__, sw);
 
-        //scratch_strings.length = 0;
-        cross_section(world, objects,
+        scratch_strings.length = 0;
+        cross_section(world, objects, render_radius,
                       char_pos, char_up, char_front, char_normal, char_right);
         debug(prof) profile_checkpoint(__LINE__, sw);
 
@@ -272,7 +273,7 @@ void main()
 }
 
 
-void cross_section(ref World world, ref float[] objects,
+void cross_section(ref World world, ref float[] objects, float render_radius,
                    Vec4 base_pos, Vec4 up, Vec4 front, Vec4 normal, Vec4 right)
 {
     // reset contents without deallocating (in theory at least)
@@ -297,7 +298,7 @@ void cross_section(ref World world, ref float[] objects,
         Vec4[8] corner_offsets;
         final switch (dir)
         {
-        case Vec4BasisSigned.X: case Vec4BasisSigned.nX:
+        case Vec4BasisSigned.X: case Vec4BasisSigned.NX:
             corner_offsets = [
                 Vec4(0, 0, 0, 0),
                 Vec4(0, 1, 0, 0),
@@ -310,7 +311,7 @@ void cross_section(ref World world, ref float[] objects,
                 ];
             break;
 
-        case Vec4BasisSigned.Y: case Vec4BasisSigned.nY:
+        case Vec4BasisSigned.Y: case Vec4BasisSigned.NY:
             corner_offsets = [
                 Vec4(0, 0, 0, 0),
                 Vec4(1, 0, 0, 0),
@@ -323,7 +324,7 @@ void cross_section(ref World world, ref float[] objects,
                 ];
             break;
 
-        case Vec4BasisSigned.Z: case Vec4BasisSigned.nZ:
+        case Vec4BasisSigned.Z: case Vec4BasisSigned.NZ:
             corner_offsets = [
                 Vec4(0, 0, 0, 0),
                 Vec4(1, 0, 0, 0),
@@ -336,7 +337,7 @@ void cross_section(ref World world, ref float[] objects,
                 ];
             break;
 
-        case Vec4BasisSigned.W: case Vec4BasisSigned.nW:
+        case Vec4BasisSigned.W: case Vec4BasisSigned.NW:
             corner_offsets = [
                 Vec4(0, 0, 0, 0),
                 Vec4(1, 0, 0, 0),
@@ -357,7 +358,7 @@ void cross_section(ref World world, ref float[] objects,
             color = [.0, .8, .0];
             break;
 
-        case Vec4BasisSigned.nX:
+        case Vec4BasisSigned.NX:
             color = [.8, .0, .0];
             break;
 
@@ -365,7 +366,7 @@ void cross_section(ref World world, ref float[] objects,
             color = [.0, .0, .8];
             break;
 
-        case Vec4BasisSigned.nY:
+        case Vec4BasisSigned.NY:
             color = [.0, .8, .8];
             break;
 
@@ -373,7 +374,7 @@ void cross_section(ref World world, ref float[] objects,
             color = [.8, .0, .8];
             break;
 
-        case Vec4BasisSigned.nZ:
+        case Vec4BasisSigned.NZ:
             color = [.8, .8, .0];
             break;
 
@@ -381,7 +382,7 @@ void cross_section(ref World world, ref float[] objects,
             color = [.2, .2, .2];
             break;
 
-        case Vec4BasisSigned.nW:
+        case Vec4BasisSigned.NW:
             color = [.7, .7, .7];
             break;
         }
@@ -503,6 +504,7 @@ void cross_section(ref World world, ref float[] objects,
     void process_chunk(ref Chunk c, ChunkPos cp)
     {
         //writeln("processing ", cp);
+        scratch_strings ~= cp.to!string();
         processed_cps ~= cp;
         c.status = ChunkStatus.PROCESSED;
 
@@ -532,10 +534,10 @@ void cross_section(ref World world, ref float[] objects,
                             continue;
                         }
 
-                        process_cube(pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.nX);
-                        process_cube(pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.nY);
-                        process_cube(pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.nZ);
-                        process_cube(pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.nW);
+                        process_cube(pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.NX);
+                        process_cube(pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.NY);
+                        process_cube(pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.NZ);
+                        process_cube(pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.NW);
                         process_cube(pos + Vec4(1, 0, 0, 0), Vec4BasisSigned.X);
                         process_cube(pos + Vec4(0, 1, 0, 0), Vec4BasisSigned.Y);
                         process_cube(pos + Vec4(0, 0, 1, 0), Vec4BasisSigned.Z);
@@ -571,7 +573,12 @@ void cross_section(ref World world, ref float[] objects,
                 continue;
             }
 
-            if (dot_p(rel_center, front) > CHUNK_SIZE)
+            // if (dot_p(rel_center, front) > CHUNK_SIZE)
+            // {
+            //     continue;
+            // }
+
+            if (rel_center.l1_norm() > render_radius)
             {
                 continue;
             }

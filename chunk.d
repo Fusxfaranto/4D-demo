@@ -78,17 +78,23 @@ ChunkPos coords_to_chunkpos(Vec4 v)
 }
 
 
-float chunkpos_dist(ChunkPos a, ChunkPos b)
+// float chunkpos_dist(ChunkPos a, ChunkPos b)
+// {
+//     return sqrt(to!real((a.x - b.x) ^^ 2 + (a.y - b.y) ^^ 2 + (a.z - b.z) ^^ 2 + (a.w - b.w) ^^ 2));
+// }
+
+int chunkpos_l1_dist(ChunkPos a, ChunkPos b)
 {
-    return sqrt(to!real((a.x - b.x) ^^ 2 + (a.y - b.y) ^^ 2 + (a.z - b.z) ^^ 2 + (a.w - b.w) ^^ 2));
+    return abs(a.x - b.x) + abs(a.y - b.y) + abs(a.z - b.z) + abs(a.w - b.w);
 }
 
 Chunk get_chunk(ChunkPos loc)
 {
     Chunk c;
 
-    if (true ||
-        loc == ChunkPos(0, 0, 0, 0))
+    if ( true ||
+        loc.w < -1
+        )
     {
         // c.grid[1][0][0][0] = BlockType.TEST;
         for (int i = 0; i < BLOCKS_IN_CHUNK; i += 10 * CHUNK_SIZE + 1)
@@ -101,21 +107,39 @@ Chunk get_chunk(ChunkPos loc)
 }
 
 
-// TODO this doesn't presently "work", i.e. it doesn't actually move the loaded area along with the player
-// perhaps use a "diamond" shape (l1 norm?) instead of a sphere, since that'd make it easy to extend the loaded space
-void load_chunks(Vec4 center, float radius, ref Chunk[ChunkPos] loaded_chunks)
+
+void load_chunks(Vec4 center, int l1_radius, ref Chunk[ChunkPos] loaded_chunks)
 {
     static ChunkPos[] load_stack;
 
-    // TODO something that allocates less
     ChunkPos center_cp = coords_to_chunkpos(center);
-    if (center_cp in loaded_chunks)
+    //if (center_cp in loaded_chunks)
+    if (true)
     {
-        return;
+        load_stack.length = 0;
+        foreach (i, start_cp; [
+                     center_cp.shift!"x"(1),
+                     center_cp.shift!"y"(1),
+                     center_cp.shift!"z"(1),
+                     center_cp.shift!"w"(1),
+                     center_cp.shift!"x"(-1),
+                     center_cp.shift!"y"(-1),
+                     center_cp.shift!"z"(-1),
+                     center_cp.shift!"w"(-1),
+                     ])
+        {
+            if (start_cp !in loaded_chunks)
+            {
+                load_stack ~= start_cp;
+                break;
+            }
+        }
     }
-
-    load_stack.length = 1;
-    load_stack[0] = center_cp;
+    else
+    {
+        load_stack.length = 1;
+        load_stack[0] = center_cp;
+    }
 
     while (!load_stack.empty())
     {
@@ -136,7 +160,7 @@ void load_chunks(Vec4 center, float radius, ref Chunk[ChunkPos] loaded_chunks)
                      ])
         {
             //writeln("try to queue ", new_cp);
-            if (chunkpos_dist(center_cp, new_cp) <= radius && new_cp !in loaded_chunks)
+            if (chunkpos_l1_dist(center_cp, new_cp) <= l1_radius && new_cp !in loaded_chunks)
             {
                 load_stack ~= new_cp;
             }
