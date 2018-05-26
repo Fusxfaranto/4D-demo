@@ -93,11 +93,11 @@ Chunk get_chunk(ChunkPos loc)
     Chunk c;
 
     if ( true ||
-        loc.w < -1
+         loc.w < -1
         )
     {
         // c.grid[1][0][0][0] = BlockType.TEST;
-        for (int i = 0; i < BLOCKS_IN_CHUNK; i += 10 * CHUNK_SIZE + 1)
+        for (int i = 0; i < BLOCKS_IN_CHUNK; i += 33)
         {
             c.data[i] = BlockType.TEST;
         }
@@ -118,14 +118,14 @@ void load_chunks(Vec4 center, int l1_radius, ref Chunk[ChunkPos] loaded_chunks)
     {
         load_stack.length = 0;
         foreach (i, start_cp; [
-                     center_cp.shift!"x"(1),
-                     center_cp.shift!"y"(1),
-                     center_cp.shift!"z"(1),
-                     center_cp.shift!"w"(1),
-                     center_cp.shift!"x"(-1),
-                     center_cp.shift!"y"(-1),
-                     center_cp.shift!"z"(-1),
-                     center_cp.shift!"w"(-1),
+                     center_cp.shift!"x"(l1_radius),
+                     center_cp.shift!"y"(l1_radius),
+                     center_cp.shift!"z"(l1_radius),
+                     center_cp.shift!"w"(l1_radius),
+                     center_cp.shift!"x"(-l1_radius),
+                     center_cp.shift!"y"(-l1_radius),
+                     center_cp.shift!"z"(-l1_radius),
+                     center_cp.shift!"w"(-l1_radius),
                      ])
         {
             if (start_cp !in loaded_chunks)

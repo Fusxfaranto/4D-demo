@@ -407,7 +407,7 @@ void render(void)
     glEnable(GL_DEPTH_TEST);
 
     glBindFramebuffer(GL_FRAMEBUFFER, main_fb);
-    glClearColor(1.0, 243.0 / 255.0, 221.0 / 255.0, 1.0);
+    glClearColor(150.0 / 255.0, 127.0 / 255.0, 96.0 / 255.0, 1.0);
 
     render_objects(objects, main_VAO, main_VBO);
 
