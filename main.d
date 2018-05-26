@@ -112,14 +112,14 @@ void main()
     //scene ~= tesseract(Vec4(1, 1, 1, 1));
 
 
-    world.scene = [];
+    world.scene.length = 0;
     world.scene ~= tesseract!(false, solid_color_gen!(0.5, 0.5, 0.5))(Vec4(-30, -30, -30, -30), Vec4(60, 60, 60, 60));
     world.scene ~= tesseract!(false, solid_color_gen!(0.6, 0.5, 0.1))(Vec4(-10, -2, -10, -10), Vec4(20, 2, 20, 20));
-    world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, 5, 0), Vec4(1, 3, 1, 1));
-    world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, -5, 0), Vec4(1, 3, 1, 1));
-    world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(-5, 0, 5, 0), Vec4(1, 3, 1, 1));
-    world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(-5, 0, -5, 0), Vec4(1, 3, 1, 1));
-    world.scene ~= tesseract!(true)(Vec4(0, 1.1, 0, 0.5), Vec4(1, 1, 1, 1));
+    //world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, 5, 0), Vec4(1, 3, 1, 1));
+    //world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, -5, 0), Vec4(1, 3, 1, 1));
+    //world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(-5, 0, 5, 0), Vec4(1, 3, 1, 1));
+    //world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(-5, 0, -5, 0), Vec4(1, 3, 1, 1));
+    //world.scene ~= tesseract!(true)(Vec4(0, 1.1, 0, 0.5), Vec4(1, 1, 1, 1));
 
     view_mat = look_at(Vec3(0, 0, 3), Vec3(0, 0, 0), Vec3(0, 1, 0));
     view = view_mat.data;
@@ -236,13 +236,14 @@ void main()
         debug(prof) profile_checkpoint(__LINE__, sw);
 
         load_chunks(char_pos, 1.5f, world.loaded_chunks);
+        scratch_strings ~= to!string(world.loaded_chunks.length);
         debug(prof) profile_checkpoint(__LINE__, sw);
 
         cross_section(world, vertical_objects,
                       char_pos, flat_normal, flat_front, global_up, flat_right);
         debug(prof) profile_checkpoint(__LINE__, sw);
 
-        scratch_strings.length = 0;
+        //scratch_strings.length = 0;
         cross_section(world, objects,
                       char_pos, char_up, char_front, char_normal, char_right);
         debug(prof) profile_checkpoint(__LINE__, sw);
@@ -490,7 +491,7 @@ void cross_section(ref World world, ref float[] objects,
         }
         if (verts.length >= 1)
         {
-            scratch_strings ~= verts.to!string();
+            //scratch_strings ~= verts.to!string();
         }
         //writeln(verts);
 
@@ -513,23 +514,32 @@ void cross_section(ref World world, ref float[] objects,
                 {
                     foreach (w; 0..CHUNK_SIZE)
                     {
-                        // TODO: first check if block is viable to have any intersection at all, and only then check each cube
-
-                        if (c.grid[x][y][z][w] != BlockType.NONE)
+                        if (c.grid[x][y][z][w] == BlockType.NONE)
                         {
-                            debug(prof) profile_checkpoint(__LINE__, sw);
-                            Vec4 pos = cp.to_vec4() + Vec4(x, y, z, w);
-
-                            process_cube(pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.nX);
-                            process_cube(pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.nY);
-                            process_cube(pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.nZ);
-                            process_cube(pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.nW);
-                            process_cube(pos + Vec4(1, 0, 0, 0), Vec4BasisSigned.X);
-                            process_cube(pos + Vec4(0, 1, 0, 0), Vec4BasisSigned.Y);
-                            process_cube(pos + Vec4(0, 0, 1, 0), Vec4BasisSigned.Z);
-                            process_cube(pos + Vec4(0, 0, 0, 1), Vec4BasisSigned.W);
-                            debug(prof) profile_checkpoint(__LINE__, sw);
+                            continue;
                         }
+
+                        Vec4 pos = cp.to_vec4() + Vec4(x, y, z, w);
+                        Vec4 rel_center = pos + Vec4(0.5, 0.5, 0.5, 0.5) - base_pos;
+
+                        if (abs(dot_p(rel_center, normal)) > 1.0)
+                        {
+                            continue;
+                        }
+
+                        if (dot_p(rel_center, front) > 1.0)
+                        {
+                            continue;
+                        }
+
+                        process_cube(pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.nX);
+                        process_cube(pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.nY);
+                        process_cube(pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.nZ);
+                        process_cube(pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.nW);
+                        process_cube(pos + Vec4(1, 0, 0, 0), Vec4BasisSigned.X);
+                        process_cube(pos + Vec4(0, 1, 0, 0), Vec4BasisSigned.Y);
+                        process_cube(pos + Vec4(0, 0, 1, 0), Vec4BasisSigned.Z);
+                        process_cube(pos + Vec4(0, 0, 0, 1), Vec4BasisSigned.W);
                     }
                 }
             }
@@ -555,7 +565,16 @@ void cross_section(ref World world, ref float[] objects,
                      cp.shift!"w"(-1),
                      ])
         {
-            // TODO if intersects hplane
+            Vec4 rel_center = cp.to_vec4_centered() - base_pos;
+            if (abs(dot_p(rel_center, normal)) > CHUNK_SIZE)
+            {
+                continue;
+            }
+
+            if (dot_p(rel_center, front) > CHUNK_SIZE)
+            {
+                continue;
+            }
 
             Chunk* p = new_cp in world.loaded_chunks;
             if (p && p.status == ChunkStatus.NOT_PROCESSED)

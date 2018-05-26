@@ -35,6 +35,11 @@ struct ChunkPos
         return Vec4(x, y, z, w) * CHUNK_SIZE;
     }
 
+    Vec4 to_vec4_centered() pure const
+    {
+        return Vec4(x + 0.5, y + 0.5, z + 0.5, w + 0.5) * CHUNK_SIZE;
+    }
+
     ChunkPos dup() pure const
     {
         return ChunkPos(x, y, z, w);
@@ -82,13 +87,14 @@ Chunk get_chunk(ChunkPos loc)
 {
     Chunk c;
 
-    if (loc == ChunkPos(0, 0, 0, 0))
+    if (true ||
+        loc == ChunkPos(0, 0, 0, 0))
     {
-        c.grid[1][0][0][0] = BlockType.TEST;
-        // for (int i = 16; i < BLOCKS_IN_CHUNK; i += 10001 * 101)
-        // {
-        //     c.data[i] = BlockType.TEST;
-        // }
+        // c.grid[1][0][0][0] = BlockType.TEST;
+        for (int i = 0; i < BLOCKS_IN_CHUNK; i += 10 * CHUNK_SIZE + 1)
+        {
+            c.data[i] = BlockType.TEST;
+        }
     }
 
     return c;
@@ -96,6 +102,7 @@ Chunk get_chunk(ChunkPos loc)
 
 
 // TODO this doesn't presently "work", i.e. it doesn't actually move the loaded area along with the player
+// perhaps use a "diamond" shape (l1 norm?) instead of a sphere, since that'd make it easy to extend the loaded space
 void load_chunks(Vec4 center, float radius, ref Chunk[ChunkPos] loaded_chunks)
 {
     static ChunkPos[] load_stack;
