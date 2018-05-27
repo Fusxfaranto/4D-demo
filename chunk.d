@@ -1,13 +1,15 @@
 
+import std.stdio : writeln, stdout;
 import std.range : back, popBack;
 import std.array : empty;
 import std.conv : to;
 import std.math : sqrt, floor;
 
 import matrix;
+import util;
 
 
-enum size_t HDTREE_N = 4;
+enum size_t HDTREE_N = 5;
 enum size_t CHUNK_SIZE = 2 ^^ HDTREE_N;
 enum size_t BLOCKS_IN_CHUNK = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 
@@ -166,7 +168,7 @@ int chunkpos_l1_dist(ChunkPos a, ChunkPos b)
 
 void initialize_hdtree(T : HDTree!N, int N)(in Chunk c, ref T tree, IndexVec4 idx = IndexVec4.init)
 {
-    static if (N <= 3)
+    static if (N <= 4)
     {
         const(BlockType)* b = &c.data[idx.to_index()];
         bool all_empty = true;
@@ -180,7 +182,7 @@ void initialize_hdtree(T : HDTree!N, int N)(in Chunk c, ref T tree, IndexVec4 id
                 {
                     for (size_t w = 0; w < 2 ^^ N; w++, b++)
                     {
-                        if (*b == BlockType.NONE)
+                        if (*b != BlockType.NONE)
                         {
                             all_empty = false;
                             break outer;
@@ -222,10 +224,22 @@ Chunk get_chunk(ChunkPos loc)
     if (loc == ChunkPos(0, 0, 0, 0)
         )
     {
-        // c.grid[1][0][0][0] = BlockType.TEST;
-        for (int i = 0; i < BLOCKS_IN_CHUNK; i += 33)
+        BlockType* b = &c.data[0];
+        foreach (x; 0..CHUNK_SIZE)
         {
-            c.data[i] = BlockType.TEST;
+            foreach (y; 0..CHUNK_SIZE)
+            {
+                foreach (z; 0..CHUNK_SIZE)
+                {
+                    for (size_t w = 0; w < CHUNK_SIZE; w++, b++)
+                    {
+                        if (w == x && w == y && w == z)
+                        {
+                            *b = BlockType.TEST;
+                        }
+                    }
+                }
+            }
         }
     }
 

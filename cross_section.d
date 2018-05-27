@@ -276,6 +276,8 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
             return;
         }
 
+        //writeln("processing ", cp, " at level ", N);
+
         // static if (N == 0)
         // {
         //     if (c.data[idx] == BlockType.NONE)
@@ -292,17 +294,23 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
         //     process_cube(pos + Vec4(0, 0, 1, 0), Vec4BasisSigned.Z);
         //     process_cube(pos + Vec4(0, 0, 0, 1), Vec4BasisSigned.W);
         // }
-        static if (N <= 3)
+        static if (N <= 4)
         {
+            enum W_SPAN = 2 ^^ N;
+            enum Z_SPAN = (2 ^^ N) * CHUNK_SIZE;
+            enum Y_SPAN = (2 ^^ N) * (CHUNK_SIZE ^^ 2);
+
             const(BlockType)* b = &c.data[idx.to_index()];
-            foreach (x; 0..(2 ^^ N))
+            for (size_t x = 0; x < 2 ^^ N; x++, b += CHUNK_SIZE ^^ 3 - Y_SPAN)
             {
-                foreach (y; 0..(2 ^^ N))
+                for (size_t y = 0; y < 2 ^^ N; y++, b += CHUNK_SIZE ^^ 2 - Z_SPAN)
                 {
-                    foreach (z; 0..(2 ^^ N))
+                    for (size_t z = 0; z < 2 ^^ N; z++, b += CHUNK_SIZE - W_SPAN)
                     {
                         for (size_t w = 0; w < 2 ^^ N; w++, b++)
                         {
+                            assert(IndexVec4(x, y, z, w).to_index() == b - &c.data[idx.to_index()]);
+
                             if (*b == BlockType.NONE)
                             {
                                 continue;

@@ -1,5 +1,5 @@
 
-import std.stdio : writeln;
+import std.stdio : writeln, stdout;
 import std.traits : OriginalType;
 import std.datetime : StopWatch;
 import std.conv : to;

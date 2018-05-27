@@ -217,7 +217,7 @@ void main()
         compass = compass_.data();
         debug(prof) profile_checkpoint();
 
-        float render_radius = 37;
+        float render_radius = 40;
         load_chunks(char_pos, cast(int)(render_radius / CHUNK_SIZE) + 1, world.loaded_chunks);
         //scratch_strings ~= to!string(world.loaded_chunks.length);
         scratch_strings ~= to!string(coords_to_chunkpos(char_pos));

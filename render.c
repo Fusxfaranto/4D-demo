@@ -1,4 +1,5 @@
 
+#include <sys/resource.h>
 
 #include "util.h"
 #include "text.h"
@@ -102,6 +103,22 @@ static void error_callback(int error, const char *description)
 
 int init(void)
 {
+    const rlim_t stack_size = 128 * 1024 * 1024;
+    struct rlimit rl;
+
+    int res;
+    if ((res = getrlimit(RLIMIT_STACK, &rl)) == 0)
+    {
+        if (rl.rlim_cur < stack_size)
+        {
+            rl.rlim_cur = stack_size;
+            if ((res = setrlimit(RLIMIT_STACK, &rl)) != 0)
+            {
+                return EXIT_FAILURE;
+            }
+        }
+    }
+
     glfwSetErrorCallback(error_callback);
 
     if (!glfwInit())
