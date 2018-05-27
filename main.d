@@ -124,7 +124,7 @@ void main()
         last_time = TickDuration.currSystemTick();
 
         process_input();
-        debug(prof) profile_checkpoint(__LINE__);
+        debug(prof) profile_checkpoint();
 
         if (force_window_size_update || last_width != width || last_height != height || last_fov != fov)
         {
@@ -148,7 +148,7 @@ void main()
 
             handle_errors!window_size_update();
         }
-        debug(prof) profile_checkpoint(__LINE__);
+        debug(prof) profile_checkpoint();
 
         Vec4 char_right = cross_p(char_up, char_front, char_normal);
 
@@ -192,7 +192,7 @@ void main()
             break;
         }
         scratch_strings.length = 0;
-        debug(prof) profile_checkpoint(__LINE__);
+        debug(prof) profile_checkpoint();
 
         Vec4 flat_front = (char_front - proj(char_front, global_up)).normalized();
         Vec4 flat_normal = (char_normal - proj(char_normal, global_up)).normalized();
@@ -215,31 +215,31 @@ void main()
 
         Vec3 compass_ = Vec3(-flat_front.x, flat_front.w, flat_front.z) + compass_base_;
         compass = compass_.data();
-        debug(prof) profile_checkpoint(__LINE__);
+        debug(prof) profile_checkpoint();
 
         float render_radius = 37;
         load_chunks(char_pos, cast(int)(render_radius / CHUNK_SIZE) + 1, world.loaded_chunks);
         //scratch_strings ~= to!string(world.loaded_chunks.length);
         scratch_strings ~= to!string(coords_to_chunkpos(char_pos));
-        debug(prof) profile_checkpoint(__LINE__);
+        debug(prof) profile_checkpoint();
 
         final switch (display_mode.to!DisplayMode)
         {
         case DisplayMode.SPLIT:
             generate_cross_section(world, vertical_objects, render_radius, cube_culling,
                                    char_pos, flat_normal, flat_front, global_up, flat_right);
-            debug(prof) profile_checkpoint(__LINE__);
+            debug(prof) profile_checkpoint();
             goto case DisplayMode.NORMAL;
 
         case DisplayMode.NORMAL:
             //scratch_strings.length = 0;
             generate_cross_section(world, objects, render_radius, cube_culling,
                           char_pos, char_up, char_front, char_normal, char_right);
-            debug(prof) profile_checkpoint(__LINE__);
+            debug(prof) profile_checkpoint();
         }
 
         render();
-        debug(prof) profile_checkpoint(__LINE__);
+        debug(prof) profile_checkpoint();
 
         for (;;)
         {
@@ -255,7 +255,7 @@ void main()
         }
 
         wait_for_next_frame();
-        debug(prof) profile_checkpoint(__LINE__);
+        debug(prof) profile_checkpoint();
 
         t++;
     }
