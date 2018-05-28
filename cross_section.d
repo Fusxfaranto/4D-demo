@@ -267,8 +267,14 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
     {
         if (tree.visibility == HDTreeVisibility.EMPTY)
         {
+            if (N < 5)
+            {
+                //writeln("found empty subtree at level ", N, " in ", cp);
+            }
             return;
         }
+
+        writeln("nonempty subtree at level ", N, " in ", cp);
 
         Vec4 section_pos = cp.to_vec4() + indexvec4_to_vec4(idx);
         if (skip_render!N(section_pos))
@@ -296,16 +302,12 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
         // }
         static if (N <= 4)
         {
-            enum W_SPAN = 2 ^^ N;
-            enum Z_SPAN = (2 ^^ N) * CHUNK_SIZE;
-            enum Y_SPAN = (2 ^^ N) * (CHUNK_SIZE ^^ 2);
-
             const(BlockType)* b = &c.data[idx.to_index()];
-            for (size_t x = 0; x < 2 ^^ N; x++, b += CHUNK_SIZE ^^ 3 - Y_SPAN)
+            for (size_t x = 0; x < 2 ^^ N; x++, b += CHUNK_SIZE ^^ 3 - Y_SPAN!N)
             {
-                for (size_t y = 0; y < 2 ^^ N; y++, b += CHUNK_SIZE ^^ 2 - Z_SPAN)
+                for (size_t y = 0; y < 2 ^^ N; y++, b += CHUNK_SIZE ^^ 2 - Z_SPAN!N)
                 {
-                    for (size_t z = 0; z < 2 ^^ N; z++, b += CHUNK_SIZE - W_SPAN)
+                    for (size_t z = 0; z < 2 ^^ N; z++, b += CHUNK_SIZE - W_SPAN!N)
                     {
                         for (size_t w = 0; w < 2 ^^ N; w++, b++)
                         {
@@ -395,7 +397,9 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
             if (p && p.status == ChunkStatus.NOT_PROCESSED)
             {
                 cs_stack ~= new_cp;
+                //debug(prof) sw.stop();
                 process_chunk(*p, new_cp);
+                //debug(prof) sw.start();
             }
         }
     }

@@ -4,6 +4,7 @@ import std.range : back, popBack;
 import std.array : empty;
 import std.conv : to;
 import std.math : sqrt, floor;
+import core.memory : GC;
 
 import matrix;
 import util;
@@ -12,6 +13,11 @@ import util;
 enum size_t HDTREE_N = 5;
 enum size_t CHUNK_SIZE = 2 ^^ HDTREE_N;
 enum size_t BLOCKS_IN_CHUNK = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
+
+enum W_SPAN(int N) = 2 ^^ N;
+enum Z_SPAN(int N) = (2 ^^ N) * CHUNK_SIZE;
+enum Y_SPAN(int N) = (2 ^^ N) * (CHUNK_SIZE ^^ 2);
+
 
 enum BlockType
 {
@@ -168,17 +174,17 @@ int chunkpos_l1_dist(ChunkPos a, ChunkPos b)
 
 void initialize_hdtree(T : HDTree!N, int N)(in Chunk c, ref T tree, IndexVec4 idx = IndexVec4.init)
 {
-    static if (N <= 4)
+    static if (N <= 3)
     {
         const(BlockType)* b = &c.data[idx.to_index()];
         bool all_empty = true;
 
     outer:
-        foreach (x; 0..(2 ^^ N))
+        for (size_t x = 0; x < 2 ^^ N; x++, b += CHUNK_SIZE ^^ 3 - Y_SPAN!N)
         {
-            foreach (y; 0..(2 ^^ N))
+            for (size_t y = 0; y < 2 ^^ N; y++, b += CHUNK_SIZE ^^ 2 - Z_SPAN!N)
             {
-                foreach (z; 0..(2 ^^ N))
+                for (size_t z = 0; z < 2 ^^ N; z++, b += CHUNK_SIZE - W_SPAN!N)
                 {
                     for (size_t w = 0; w < 2 ^^ N; w++, b++)
                     {
@@ -195,6 +201,16 @@ void initialize_hdtree(T : HDTree!N, int N)(in Chunk c, ref T tree, IndexVec4 id
         if (all_empty)
         {
             tree.visibility = HDTreeVisibility.EMPTY;
+        }
+        else
+        {
+            static if (N > 0)
+            {
+                foreach (i; 0..16)
+                {
+                    initialize_hdtree(c, tree[i], idx + get_hdtree_index!N(i));
+                }
+            }
         }
     }
     else
@@ -213,6 +229,22 @@ void initialize_hdtree(T : HDTree!N, int N)(in Chunk c, ref T tree, IndexVec4 id
         if (all_empty)
         {
             tree.visibility = HDTreeVisibility.EMPTY;
+        }
+    }
+}
+
+void initialize_empty_hdtree(T : HDTree!N, int N)(ref T tree)
+{
+    static if (N == 0)
+    {
+        tree.visibility = HDTreeVisibility.EMPTY;
+    }
+    else
+    {
+        tree.visibility = HDTreeVisibility.EMPTY;
+        foreach (i; 0..16)
+        {
+            initialize_empty_hdtree(tree[i]);
         }
     }
 }
@@ -241,9 +273,13 @@ Chunk get_chunk(ChunkPos loc)
                 }
             }
         }
-    }
 
-    initialize_hdtree(c, c.tree);
+        initialize_hdtree(c, c.tree);
+    }
+    else
+    {
+        initialize_empty_hdtree(c.tree);
+    }
 
     return c;
 }
@@ -253,12 +289,15 @@ Chunk get_chunk(ChunkPos loc)
 void load_chunks(Vec4 center, int l1_radius, ref Chunk[ChunkPos] loaded_chunks)
 {
     static ChunkPos[] load_stack;
+    load_stack.length = 0;
+
+    GC.disable();
+    scope(exit) GC.enable();
 
     ChunkPos center_cp = coords_to_chunkpos(center);
     //if (center_cp in loaded_chunks)
     if (true)
     {
-        load_stack.length = 0;
         foreach (i, start_cp; [
                      center_cp.shift!"x"(l1_radius),
                      center_cp.shift!"y"(l1_radius),
@@ -279,16 +318,22 @@ void load_chunks(Vec4 center, int l1_radius, ref Chunk[ChunkPos] loaded_chunks)
     }
     else
     {
-        load_stack.length = 1;
-        load_stack[0] = center_cp;
+        load_stack ~= center_cp;
     }
 
     while (!load_stack.empty())
     {
         ChunkPos cp = load_stack.back();
         load_stack.popBack();
+
+        if (cp in loaded_chunks)
+        {
+            continue;
+        }
+
         loaded_chunks[cp] = get_chunk(cp);
         writeln("loaded ", cp);
+        debug(prof) profile_checkpoint();
 
         foreach (new_cp; [
                      cp.shift!"x"(1),
