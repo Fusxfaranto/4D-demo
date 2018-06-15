@@ -11,6 +11,7 @@ import util;
 
 
 enum size_t HDTREE_N = 5;
+enum size_t HDTREE_RES = 2;
 enum size_t CHUNK_SIZE = 2 ^^ HDTREE_N;
 enum size_t BLOCKS_IN_CHUNK = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 
@@ -83,7 +84,9 @@ enum HDTreeVisibility
 
 struct HDTree(int N)
 {
-    static if (N == 0)
+    static assert (N >= HDTREE_RES);
+
+    static if (N <= HDTREE_RES)
     {
         // TODO should we really keep an index here?
         //size_t _index;
@@ -174,7 +177,7 @@ int chunkpos_l1_dist(ChunkPos a, ChunkPos b)
 
 void initialize_hdtree(T : HDTree!N, int N)(in Chunk c, ref T tree, IndexVec4 idx = IndexVec4.init)
 {
-    static if (N <= 3)
+    static if (N <= HDTREE_RES + 1)
     {
         const(BlockType)* b = &c.data[idx.to_index()];
         bool all_empty = true;
@@ -204,7 +207,7 @@ void initialize_hdtree(T : HDTree!N, int N)(in Chunk c, ref T tree, IndexVec4 id
         }
         else
         {
-            static if (N > 0)
+            static if (N > HDTREE_RES)
             {
                 foreach (i; 0..16)
                 {
@@ -233,9 +236,10 @@ void initialize_hdtree(T : HDTree!N, int N)(in Chunk c, ref T tree, IndexVec4 id
     }
 }
 
-void initialize_empty_hdtree(T : HDTree!N, int N)(ref T tree)
+T initialize_empty_hdtree(T : HDTree!N, int N)()
 {
-    static if (N == 0)
+    T tree;
+    static if (N <= HDTREE_RES)
     {
         tree.visibility = HDTreeVisibility.EMPTY;
     }
@@ -244,10 +248,13 @@ void initialize_empty_hdtree(T : HDTree!N, int N)(ref T tree)
         tree.visibility = HDTreeVisibility.EMPTY;
         foreach (i; 0..16)
         {
-            initialize_empty_hdtree(tree[i]);
+            tree[i] = initialize_empty_hdtree!(HDTree!(N - 1))();
         }
     }
+    return tree;
 }
+
+enum HDTree!HDTREE_N EMPTY_HDTREE = initialize_empty_hdtree!(HDTree!HDTREE_N)();
 
 Chunk get_chunk(ChunkPos loc)
 {
@@ -278,7 +285,7 @@ Chunk get_chunk(ChunkPos loc)
     }
     else
     {
-        initialize_empty_hdtree(c.tree);
+        c.tree = EMPTY_HDTREE;
     }
 
     return c;

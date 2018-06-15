@@ -263,7 +263,7 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
         return false;
     }
 
-    void process_hdtree(T : HDTree!N, int N)(ref T tree, IndexVec4 idx, in Chunk c, in ChunkPos cp)
+    void process_hdtree(T : HDTree!N, int N)(ref T tree, IndexVec4 idx, ref in Chunk c, in ChunkPos cp)
     {
         if (tree.visibility == HDTreeVisibility.EMPTY)
         {
@@ -274,7 +274,7 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
             return;
         }
 
-        writeln("nonempty subtree at level ", N, " in ", cp);
+        //writeln("nonempty subtree at level ", N, " in ", cp);
 
         Vec4 section_pos = cp.to_vec4() + indexvec4_to_vec4(idx);
         if (skip_render!N(section_pos))
@@ -300,7 +300,7 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
         //     process_cube(pos + Vec4(0, 0, 1, 0), Vec4BasisSigned.Z);
         //     process_cube(pos + Vec4(0, 0, 0, 1), Vec4BasisSigned.W);
         // }
-        static if (N <= 4)
+        static if (N <= HDTREE_RES + 1)
         {
             const(BlockType)* b = &c.data[idx.to_index()];
             for (size_t x = 0; x < 2 ^^ N; x++, b += CHUNK_SIZE ^^ 3 - Y_SPAN!N)
@@ -311,7 +311,7 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
                     {
                         for (size_t w = 0; w < 2 ^^ N; w++, b++)
                         {
-                            assert(IndexVec4(x, y, z, w).to_index() == b - &c.data[idx.to_index()]);
+                            //assert(IndexVec4(x, y, z, w).to_index() == b - &c.data[idx.to_index()]);
 
                             if (*b == BlockType.NONE)
                             {
