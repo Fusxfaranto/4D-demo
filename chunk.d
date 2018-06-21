@@ -3,7 +3,7 @@ import std.stdio : writeln, stdout;
 import std.range : back, popBack;
 import std.array : empty;
 import std.conv : to;
-import std.math : sqrt, floor;
+import std.math : abs, sqrt, floor;
 import core.memory : GC;
 
 import matrix;
@@ -134,6 +134,16 @@ struct Chunk
 
     ChunkStatus status;
     HDTree!HDTREE_N tree;
+
+    const(BlockType*) begin() const pure
+    {
+        return &data[0];
+    }
+
+    const(BlockType*) end() const pure
+    {
+        return &data[0] + BLOCKS_IN_CHUNK;
+    }
 }
 
 
@@ -256,32 +266,49 @@ T initialize_empty_hdtree(T : HDTree!N, int N)()
 
 enum HDTree!HDTREE_N EMPTY_HDTREE = initialize_empty_hdtree!(HDTree!HDTREE_N)();
 
-Chunk get_chunk(ChunkPos loc)
+Chunk gen_fixed_chunk()
 {
     Chunk c;
-
-    if (loc == ChunkPos(0, 0, 0, 0)
-        )
+    BlockType* b = &c.data[0];
+    foreach (x; 0..CHUNK_SIZE)
     {
-        BlockType* b = &c.data[0];
-        foreach (x; 0..CHUNK_SIZE)
+        foreach (y; 0..CHUNK_SIZE)
         {
-            foreach (y; 0..CHUNK_SIZE)
+            foreach (z; 0..CHUNK_SIZE)
             {
-                foreach (z; 0..CHUNK_SIZE)
+                for (size_t w = 0; w < CHUNK_SIZE; w++, b++)
                 {
-                    for (size_t w = 0; w < CHUNK_SIZE; w++, b++)
+                    //if (w == x && w == y && w == z)
+                    if (x < 8 && y < 8 && z < 8 && w < 8)
                     {
-                        if (w == x && w == y && w == z)
-                        {
-                            *b = BlockType.TEST;
-                        }
+                        *b = BlockType.TEST;
                     }
                 }
             }
         }
+    }
 
-        initialize_hdtree(c, c.tree);
+    initialize_hdtree(c, c.tree);
+    return c;
+}
+
+Chunk get_chunk(ChunkPos loc)
+{
+    static Chunk* fixed_chunk = null;
+
+    Chunk c;
+
+    if (true ||
+        loc == ChunkPos(0, 0, 0, 0)
+        )
+    {
+        if (!fixed_chunk)
+        {
+            fixed_chunk = new Chunk();
+            *fixed_chunk = gen_fixed_chunk();
+        }
+
+        c = *fixed_chunk;
     }
     else
     {

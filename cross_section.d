@@ -1,9 +1,9 @@
 
 import std.stdio : writeln;
 import std.conv : to;
-import std.math : PI, sin, cos, acos, sgn;
-import std.datetime : TickDuration, StopWatch;
-import std.array : array;
+import std.math : PI, sin, cos, acos, sgn, sqrt, abs;
+import std.range : back, popBack;
+import std.array : array, empty;
 import std.algorithm : sum, map;
 import std.typecons : Tuple, tuple;
 
@@ -224,12 +224,12 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
                 objects ~= objects[($ - 2 * 6)..($ - 1 * 6)];
             }
 
-            objects ~= [
-                dot_p(right, rel_intersection_point),
-                dot_p(up, rel_intersection_point),
-                dot_p(front, rel_intersection_point),
-                color[0], color[1], color[2]
-                ];
+            objects ~= dot_p(right, rel_intersection_point);
+            objects ~= dot_p(up, rel_intersection_point);
+            objects ~= dot_p(front, rel_intersection_point);
+            objects ~= color[0];
+            objects ~= color[1];
+            objects ~= color[2];
         }
         if (verts.length >= 1)
         {
@@ -311,7 +311,7 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
                     {
                         for (size_t w = 0; w < 2 ^^ N; w++, b++)
                         {
-                            //assert(IndexVec4(x, y, z, w).to_index() == b - &c.data[idx.to_index()]);
+                            assert(IndexVec4(x, y, z, w).to_index() == b - &c.data[idx.to_index()]);
 
                             if (*b == BlockType.NONE)
                             {
@@ -324,14 +324,40 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
                                 continue;
                             }
 
-                            process_cube(block_pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.NX);
-                            process_cube(block_pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.NY);
-                            process_cube(block_pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.NZ);
-                            process_cube(block_pos + Vec4(0, 0, 0, 0), Vec4BasisSigned.NW);
-                            process_cube(block_pos + Vec4(1, 0, 0, 0), Vec4BasisSigned.X);
-                            process_cube(block_pos + Vec4(0, 1, 0, 0), Vec4BasisSigned.Y);
-                            process_cube(block_pos + Vec4(0, 0, 1, 0), Vec4BasisSigned.Z);
-                            process_cube(block_pos + Vec4(0, 0, 0, 1), Vec4BasisSigned.W);
+                            // TODO add actual "transparent" property
+                            // TODO do something smarter at chunk boundaries?
+                            if (b - CHUNK_SIZE ^^ 3 >= c.begin() && b[-(CHUNK_SIZE ^^ 3)] == BlockType.NONE)
+                            {
+                                process_cube(block_pos, Vec4BasisSigned.NX);
+                            }
+                            if (b - CHUNK_SIZE ^^ 2 >= c.begin() && b[-(CHUNK_SIZE ^^ 2)] == BlockType.NONE)
+                            {
+                                process_cube(block_pos, Vec4BasisSigned.NY);
+                            }
+                            if (b - CHUNK_SIZE ^^ 1 >= c.begin() && b[-(CHUNK_SIZE ^^ 1)] == BlockType.NONE)
+                            {
+                                process_cube(block_pos, Vec4BasisSigned.NZ);
+                            }
+                            if (b - CHUNK_SIZE ^^ 0 >= c.begin() && b[-(CHUNK_SIZE ^^ 0)] == BlockType.NONE)
+                            {
+                                process_cube(block_pos, Vec4BasisSigned.NW);
+                            }
+                            if (b + CHUNK_SIZE ^^ 3 < c.end() && b[CHUNK_SIZE ^^ 3] == BlockType.NONE)
+                            {
+                                process_cube(block_pos + Vec4(1, 0, 0, 0), Vec4BasisSigned.X);
+                            }
+                            if (b + CHUNK_SIZE ^^ 2 < c.end() && b[CHUNK_SIZE ^^ 2] == BlockType.NONE)
+                            {
+                                process_cube(block_pos + Vec4(0, 1, 0, 0), Vec4BasisSigned.Y);
+                            }
+                            if (b + CHUNK_SIZE ^^ 1 < c.end() && b[CHUNK_SIZE ^^ 1] == BlockType.NONE)
+                            {
+                                process_cube(block_pos + Vec4(0, 0, 1, 0), Vec4BasisSigned.Z);
+                            }
+                            if (b + CHUNK_SIZE ^^ 0 < c.end() && b[CHUNK_SIZE ^^ 0] == BlockType.NONE)
+                            {
+                                process_cube(block_pos + Vec4(0, 0, 0, 1), Vec4BasisSigned.W);
+                            }
                         }
                     }
                 }

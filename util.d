@@ -1,7 +1,8 @@
 
 import std.stdio : writeln, stdout;
 import std.traits : OriginalType;
-import std.datetime : StopWatch;
+import std.datetime.stopwatch : StopWatch;
+import std.datetime : to, TickDuration;
 import std.conv : to;
 
 
@@ -47,7 +48,7 @@ void profile_checkpoint(string file = __FILE__, size_t line = __LINE__)()
 {
     debug(prof)
     {
-        writeln(file, '\t', line, '\t', sw.peek().usecs);
+        writeln(file, '\t', line, '\t', to!("usecs", long)(to!TickDuration(sw.peek())));
         sw.reset();
     }
 }

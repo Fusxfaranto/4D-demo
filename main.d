@@ -1,8 +1,9 @@
 
 import std.stdio : writeln;
 import std.conv : to;
-import std.math : PI, sin, cos, acos, sgn;
-import std.datetime : TickDuration, StopWatch;
+import std.math : PI, sin, cos, acos, sgn, abs;
+import std.datetime : TickDuration;
+import std.datetime.stopwatch : StopWatch;
 import std.array : array;
 import std.algorithm : sum, map;
 import std.typecons : Tuple, tuple;
@@ -58,6 +59,9 @@ void main()
     width = 1280;
     height = 800;
     display_mode = DisplayMode.NORMAL;
+
+    // GC.disable();
+    // scope(exit) GC.enable();
 
 
     Vec3 compass_base_ = Vec3(0, 0, 0);

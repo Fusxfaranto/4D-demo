@@ -4,6 +4,7 @@ import matrix;
 
 import std.algorithm : map;
 import std.array : array;
+import std.math : sqrt;
 
 
 
