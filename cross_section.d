@@ -326,35 +326,35 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
 
                             // TODO add actual "transparent" property
                             // TODO do something smarter at chunk boundaries?
-                            if (b - CHUNK_SIZE ^^ 3 >= c.begin() && b[-(CHUNK_SIZE ^^ 3)] == BlockType.NONE)
+                            if (b - CHUNK_SIZE ^^ 3 < c.begin() || b[-(CHUNK_SIZE ^^ 3)] == BlockType.NONE)
                             {
                                 process_cube(block_pos, Vec4BasisSigned.NX);
                             }
-                            if (b - CHUNK_SIZE ^^ 2 >= c.begin() && b[-(CHUNK_SIZE ^^ 2)] == BlockType.NONE)
+                            if (b - CHUNK_SIZE ^^ 2 < c.begin() || b[-(CHUNK_SIZE ^^ 2)] == BlockType.NONE)
                             {
                                 process_cube(block_pos, Vec4BasisSigned.NY);
                             }
-                            if (b - CHUNK_SIZE ^^ 1 >= c.begin() && b[-(CHUNK_SIZE ^^ 1)] == BlockType.NONE)
+                            if (b - CHUNK_SIZE ^^ 1 < c.begin() || b[-(CHUNK_SIZE ^^ 1)] == BlockType.NONE)
                             {
                                 process_cube(block_pos, Vec4BasisSigned.NZ);
                             }
-                            if (b - CHUNK_SIZE ^^ 0 >= c.begin() && b[-(CHUNK_SIZE ^^ 0)] == BlockType.NONE)
+                            if (b - CHUNK_SIZE ^^ 0 < c.begin() || b[-(CHUNK_SIZE ^^ 0)] == BlockType.NONE)
                             {
                                 process_cube(block_pos, Vec4BasisSigned.NW);
                             }
-                            if (b + CHUNK_SIZE ^^ 3 < c.end() && b[CHUNK_SIZE ^^ 3] == BlockType.NONE)
+                            if (b + CHUNK_SIZE ^^ 3 >= c.end() || b[CHUNK_SIZE ^^ 3] == BlockType.NONE)
                             {
                                 process_cube(block_pos + Vec4(1, 0, 0, 0), Vec4BasisSigned.X);
                             }
-                            if (b + CHUNK_SIZE ^^ 2 < c.end() && b[CHUNK_SIZE ^^ 2] == BlockType.NONE)
+                            if (b + CHUNK_SIZE ^^ 2 >= c.end() || b[CHUNK_SIZE ^^ 2] == BlockType.NONE)
                             {
                                 process_cube(block_pos + Vec4(0, 1, 0, 0), Vec4BasisSigned.Y);
                             }
-                            if (b + CHUNK_SIZE ^^ 1 < c.end() && b[CHUNK_SIZE ^^ 1] == BlockType.NONE)
+                            if (b + CHUNK_SIZE ^^ 1 >= c.end() || b[CHUNK_SIZE ^^ 1] == BlockType.NONE)
                             {
                                 process_cube(block_pos + Vec4(0, 0, 1, 0), Vec4BasisSigned.Z);
                             }
-                            if (b + CHUNK_SIZE ^^ 0 < c.end() && b[CHUNK_SIZE ^^ 0] == BlockType.NONE)
+                            if (b + CHUNK_SIZE ^^ 0 >= c.end() || b[CHUNK_SIZE ^^ 0] == BlockType.NONE)
                             {
                                 process_cube(block_pos + Vec4(0, 0, 0, 1), Vec4BasisSigned.W);
                             }

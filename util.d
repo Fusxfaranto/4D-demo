@@ -48,7 +48,7 @@ void profile_checkpoint(string file = __FILE__, size_t line = __LINE__)()
 {
     debug(prof)
     {
-        writeln(file, '\t', line, '\t', to!("usecs", long)(to!TickDuration(sw.peek())));
+        writeln(file, ':', line, '\t', to!("usecs", long)(to!TickDuration(sw.peek())));
         sw.reset();
     }
 }
