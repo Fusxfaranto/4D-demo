@@ -443,10 +443,10 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
 
     void run(ref in Vertex[4][] tets)
     {
+        Vec4[4] rel_pos;  // potentially slower to store this instead of just recomputing?
+        bool[4] pos_side;
         foreach (ref tet; tets)
         {
-            Vec4[4] rel_pos;  // potentially slower to store this instead of just recomputing?
-            bool[4] pos_side;
             for (int i = 0; i < 4; i++)
             {
                 rel_pos[i] = tet[i].loc - base_pos;

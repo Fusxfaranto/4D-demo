@@ -10,7 +10,7 @@ import matrix;
 import util;
 
 
-enum size_t HDTREE_N = 5;
+enum size_t HDTREE_N = 4;
 enum size_t HDTREE_RES = 2;
 enum size_t CHUNK_SIZE = 2 ^^ HDTREE_N;
 enum size_t BLOCKS_IN_CHUNK = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
@@ -76,6 +76,8 @@ struct IndexVec4
 }
 
 
+// TODO mark "surrounded" segments as invisible
+// (n.b. an unloaded neighboring chunk counts as an opaque wall)
 enum HDTreeVisibility
 {
     VISIBLE,
@@ -279,7 +281,9 @@ Chunk gen_fixed_chunk()
                 for (size_t w = 0; w < CHUNK_SIZE; w++, b++)
                 {
                     //if (w == x && w == y && w == z)
-                    if (x < 8 && y < 8 && z < 8 && w < 8)
+                    //if (x < 8 && y < 8 && z < 8 && w < 8)
+                    //if (x < 4 && y < 4 && z < 4 && w < 4)
+                    if ((b - &c.data[0]) % 1755 == 0)
                     {
                         *b = BlockType.TEST;
                     }

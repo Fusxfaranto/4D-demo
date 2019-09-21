@@ -92,7 +92,8 @@ void main()
 
 
     world.scene.length = 0;
-    world.scene ~= tesseract!(false, solid_color_gen!(0.5, 0.5, 0.5))(Vec4(-30, -30, -30, -30), Vec4(60, 60, 60, 60));
+    //world.scene ~= tesseract!(false, solid_color_gen!(0.5, 0.5, 0.5))(Vec4(-30, -30, -30, -30), Vec4(60, 60, 60, 60));
+    world.scene ~= tesseract!(false, solid_color_gen!(0.5, 0.5, 0.5))(Vec4(-500, -500, -500, -500), Vec4(1000, 1000, 1000, 1000));
     //world.scene ~= tesseract!(false, solid_color_gen!(0.6, 0.5, 0.1))(Vec4(-10, -2, -10, -10), Vec4(20, 2, 20, 20));
     //world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, 5, 0), Vec4(1, 3, 1, 1));
     //world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, -5, 0), Vec4(1, 3, 1, 1));
@@ -142,8 +143,8 @@ void main()
                 r /= 2;
                 break;
             }
-            projection_mat = perspective(fov, r, 0.1, 100);
-            compass_projection_mat = perspective(deg_to_rad(45), width, 0.1, 100);
+            projection_mat = perspective(fov, r, 0.1, 1000);
+            compass_projection_mat = perspective(deg_to_rad(45), width, 0.1, 1000);
             //projection_mat = orthographic(-width / 400.0, width / 400.0, -height / 400.0, height / 400.0, -10, 100);
             last_height = height;
             last_width = width;
@@ -221,7 +222,7 @@ void main()
         compass = compass_.data();
         debug(prof) profile_checkpoint();
 
-        float render_radius = 100;
+        float render_radius = 70;
         load_chunks(char_pos, cast(int)(render_radius / CHUNK_SIZE) + 1, world.loaded_chunks);
         //scratch_strings ~= to!string(world.loaded_chunks.length);
         scratch_strings ~= to!string(coords_to_chunkpos(char_pos));

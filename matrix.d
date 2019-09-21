@@ -190,7 +190,7 @@ Vec4 from_basis(Vec4BasisSigned b)
 
 Vec4 cross_p()(auto ref in Vec4 a, auto ref in Vec4 b, auto ref in Vec4 c) pure
 {
-    // TODO: this can be optimized, see http://steve.hollasch.net/thesis/chapter2.html
+    // TODO: this can be optimized, see https://web.archive.org/web/20130921082248/http://steve.hollasch.net/thesis/chapter2.html
     return Vec4(
         a.w * b.y * c.z - a.w * c.y * b.z - b.w * a.y * c.z + b.w * c.y * a.z + c.w * a.y * b.z - c.w * b.y * a.z,
         -a.w * b.x * c.z + a.w * c.x * b.z + b.w * a.x * c.z - b.w * c.x * a.z - c.w * a.x * b.z + c.w * b.x * a.z,

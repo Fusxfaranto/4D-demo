@@ -150,7 +150,7 @@ int init(void)
 
 
     CHECK_RES(create_shader(&base_shader, "vertex.glsl", NULL, "fragment.glsl"));
-    CHECK_RES(create_shader(&compass_shader, "compass_vertex.glsl", NULL,"compass_fragment.glsl"));
+    CHECK_RES(create_shader(&compass_shader, "compass_vertex.glsl", NULL, "compass_fragment.glsl"));
     CHECK_RES(create_shader(&fb_shader, "fb_vertex.glsl", "fb_geometry.glsl", "fb_fragment.glsl"));
 
     view_loc = glGetUniformLocation(base_shader, "view");
