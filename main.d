@@ -48,7 +48,23 @@ string[] scratch_strings;
 //Vec4[2] test_plane = [Vec4(0.5, 0.5, 0.5, 0.5), Vec4(-0.5, -0.5, 0.5, 0.5)];
 //float test_angle = 0;
 
+int[2][12] adjacent_corners = [
+    [0, 1],
+    [0, 2],
+    [0, 3],
+    [1, 4],
+    [1, 5],
+    [2, 4],
+    [2, 6],
+    [3, 5],
+    [3, 6],
+    [4, 7],
+    [5, 7],
+    [6, 7],
+    ];
 
+
+bool do_close = false;
 
 
 void main()
@@ -119,7 +135,7 @@ void main()
     float[30] fpss;
     debug(prof) sw.start();
 
-    while (!glfwWindowShouldClose(w))
+    while (!glfwWindowShouldClose(w) && !do_close)
     {
         debug(prof) writeln("tick start");
         debug(prof) sw.reset();
@@ -197,6 +213,7 @@ void main()
             break;
         }
         scratch_strings.length = 0;
+        scratch_strings.assumeSafeAppend();
         debug(prof) profile_checkpoint();
 
         Vec4 flat_front = (char_front - proj(char_front, global_up)).normalized();
@@ -224,6 +241,7 @@ void main()
 
         float render_radius = 70;
         load_chunks(char_pos, cast(int)(render_radius / CHUNK_SIZE) + 1, world.loaded_chunks);
+
         //scratch_strings ~= to!string(world.loaded_chunks.length);
         scratch_strings ~= to!string(coords_to_chunkpos(char_pos));
         debug(prof) profile_checkpoint();
@@ -231,16 +249,35 @@ void main()
         final switch (display_mode.to!DisplayMode)
         {
         case DisplayMode.SPLIT:
+        {
             generate_cross_section(world, vertical_objects, render_radius, cube_culling,
                                    char_pos, flat_normal, flat_front, global_up, flat_right);
             debug(prof) profile_checkpoint();
             goto case DisplayMode.NORMAL;
 
+        }
+
         case DisplayMode.NORMAL:
+        {
+            {
+                // TODO don't do these each frame
+                cuboid_uniforms.base_pos = char_pos.data();
+                cuboid_uniforms.normal = char_normal.data();
+                cuboid_uniforms.right = char_right.data();
+                cuboid_uniforms.up = char_up.data();
+                cuboid_uniforms.front = char_front.data();
+
+                cuboid_uniforms.adjacent_corners = &adjacent_corners[0][0];
+
+                cuboid_uniforms.view = view_mat.data();
+                cuboid_uniforms.projection = projection_mat.data();
+            }
+
             //scratch_strings.length = 0;
             generate_cross_section(world, objects, render_radius, cube_culling,
                           char_pos, char_up, char_front, char_normal, char_right);
             debug(prof) profile_checkpoint();
+        }
         }
 
         render();
@@ -372,6 +409,12 @@ extern (C) void key_callback(GLFWwindow* window, int key, int scancode, int acti
     case GLFWKey.GLFW_KEY_EQUAL:
     {
         text_display = inc_enum!TextDisplay(text_display);
+        break;
+    }
+
+    case GLFWKey.GLFW_KEY_ESCAPE:
+    {
+        do_close = true;
         break;
     }
 

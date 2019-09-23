@@ -30,7 +30,7 @@ int create_shader(GLuint *shader_program, const char *vs_filename,
                   const char* gs_filename, const char *fs_filename)
 {
     GLint success;
-    GLchar buffer[1024];
+    GLchar buffer[1024 * 64];
     const GLchar *buffer_p = buffer;
 
     FILE *f = fopen(vs_filename, "r");

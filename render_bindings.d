@@ -1,6 +1,9 @@
 
 struct GLFWwindow;
 
+// TODO if we can keep this opaque to the D code, that'd be great
+struct ChunkGLData;
+
 extern (C) void glfwPollEvents();
 extern (C) int glfwWindowShouldClose(GLFWwindow* window);
 extern (C) int glfwGetKey(GLFWwindow* window, int key);
@@ -14,6 +17,27 @@ extern (C) int window_size_update();
 extern (C) void wait_for_next_frame();
 extern (C) void cleanup();
 extern (C) int init();
+
+enum MAX_RENDERED_CHUNKS = 8191;
+extern (C) extern __gshared ChunkGLData*[MAX_RENDERED_CHUNKS + 1] cuboid_data;
+extern (C) extern __gshared ChunkGLData*[MAX_RENDERED_CHUNKS + 1] cuboid_data_vertical;
+extern (C) void* gen_chunk_gl_data(ChunkGLData**);
+extern (C) void finish_chunk_gl_data(ChunkGLData*, size_t);
+
+struct CuboidShaderData {
+    float *base_pos;
+    float *normal;
+    float *right;
+    float *up;
+    float *front;
+
+    int *adjacent_corners;
+
+    float *view;
+    float *projection;
+}
+extern (C) extern __gshared CuboidShaderData cuboid_uniforms;
+extern (C) extern __gshared CuboidShaderData cuboid_uniforms_vertical;
 
 enum MAX_TEXTS = 16;
 

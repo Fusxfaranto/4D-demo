@@ -5,20 +5,27 @@ import std.math : PI, sin, cos, acos, sgn, sqrt, abs;
 import std.range : back, popBack;
 import std.array : array, empty;
 import std.algorithm : sum, map;
+import std.traits : EnumMembers;
 import std.typecons : Tuple, tuple;
 
 import util;
+import render_bindings;
 import shapes;
 import matrix;
 import chunk;
 import world;
 
 
+
+// TODO there is still allocations (and therefore GC) happening in this function at steady state.  array literals are probably the culprit
+
 void generate_cross_section(ref World world, ref float[] objects, float render_radius, bool cube_culling,
                             Vec4 base_pos, Vec4 up, Vec4 front, Vec4 normal, Vec4 right)
 {
     // reset contents without deallocating (in theory at least)
+    // LIES this totally deallocates
     objects.length = 0;
+    objects.assumeSafeAppend();
 
     static ChunkPos[] cs_stack;
     static ChunkPos[] processed_cps;
@@ -27,6 +34,7 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
 
     ChunkPos center_cp = coords_to_chunkpos(base_pos);
     cs_stack.length = 1;
+    cs_stack.assumeSafeAppend();
     cs_stack[0] = center_cp;
 
     void process_cube(Vec4 pos, Vec4BasisSigned dir)
@@ -153,6 +161,7 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
 
         static size_t[] verts;
         verts.length = 0;
+        verts.assumeSafeAppend();
 
         foreach (i, t; adjacent_corners)
         {
@@ -373,6 +382,7 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
         }
     }
 
+    ChunkGLData** gl_data_p = &cuboid_data[0];
     void process_chunk(ref Chunk c, ChunkPos cp)
     {
         //writeln("processing ", cp);
@@ -380,8 +390,15 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
         processed_cps ~= cp;
         c.status = ChunkStatus.PROCESSED;
 
-        process_hdtree(c.tree, IndexVec4.init, c, cp);
-        //debug(prof) profile_checkpoint();
+        if (false) {
+            process_hdtree(c.tree, IndexVec4.init, c, cp);
+        } else {
+            // if (skip_render!HDTREE_N(cp.to_vec4())) {
+            //     return;
+            // }
+
+            *gl_data_p++ = c.gl_data;
+        }
     }
 
     assert(center_cp in world.loaded_chunks);
@@ -392,18 +409,22 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
         ChunkPos cp = cs_stack.back();
         cs_stack.popBack();
 
-        foreach (new_cp; [
-                     cp.shift!"x"(1),
-                     cp.shift!"y"(1),
-                     cp.shift!"z"(1),
-                     cp.shift!"w"(1),
-                     cp.shift!"x"(-1),
-                     cp.shift!"y"(-1),
-                     cp.shift!"z"(-1),
-                     cp.shift!"w"(-1),
-                     ])
+        for (int i = 0; i < 8; i++)
         {
-            Vec4 rel_center = cp.to_vec4_centered() - base_pos;
+            // TODO this logic can probably be reordered more optimally
+            ChunkPos new_cp = void;
+            final switch (i) {
+            case 0: new_cp = cp.shift!"x"(1); break;
+            case 1: new_cp = cp.shift!"y"(1); break;
+            case 2: new_cp = cp.shift!"z"(1); break;
+            case 3: new_cp = cp.shift!"w"(1); break;
+            case 4: new_cp = cp.shift!"x"(-1); break;
+            case 5: new_cp = cp.shift!"y"(-1); break;
+            case 6: new_cp = cp.shift!"z"(-1); break;
+            case 7: new_cp = cp.shift!"w"(-1); break;
+            }
+
+            Vec4 rel_center = new_cp.to_vec4_centered() - base_pos;
             if (abs(dot_p(rel_center, normal)) > CHUNK_SIZE)
             {
                 continue;
@@ -436,6 +457,7 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
         world.loaded_chunks[cp].status = ChunkStatus.NOT_PROCESSED;
     }
     processed_cps.length = 0;
+    processed_cps.assumeSafeAppend();
 
     //writeln(objects[0..10]);
     debug(prof) profile_checkpoint();

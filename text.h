@@ -2,6 +2,9 @@
 #include "util.h"
 
 
+// wow, there's a lot of jank here
+
+
 #define PTC(coord_, width_) (coord_ + coord_ + 1.0) / (2 * width_)
 
 

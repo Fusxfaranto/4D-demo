@@ -59,6 +59,35 @@ GLuint compass_shader;
 GLuint compass_fb;
 GLuint compass_tex;
 
+
+// TODO ???
+#define MAX_CUBES_IN_CHUNK (16 << 3)
+typedef struct ChunkGLData {
+    GLuint VAO;
+    GLuint VBO;
+    GLsizei len;
+} ChunkGLData;
+
+#define MAX_RENDERED_CHUNKS 8191
+GLuint cuboid_shader;
+ChunkGLData *cuboid_data[MAX_RENDERED_CHUNKS + 1];
+ChunkGLData *cuboid_data_vertical[MAX_RENDERED_CHUNKS + 1];
+
+typedef struct CuboidShaderData {
+    float *base_pos;
+    float *normal;
+    float *right;
+    float *up;
+    float *front;
+
+    int *adjacent_corners;
+
+    float *view;
+    float *projection;
+} CuboidShaderData;
+CuboidShaderData cuboid_uniforms;
+CuboidShaderData cuboid_uniforms_vertical;
+
 GLuint vertical_VBO;
 GLuint vertical_VAO;
 FloatDArray vertical_objects;
@@ -79,6 +108,7 @@ struct
     float y_scale;
     float line_spacing;
 } screen_text_data[MAX_TEXTS];
+
 
 
 
@@ -125,6 +155,8 @@ int init(void)
     {
         return EXIT_FAILURE;
     }
+    // TODO ???
+    // glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -151,6 +183,7 @@ int init(void)
 
     CHECK_RES(create_shader(&base_shader, "vertex.glsl", NULL, "fragment.glsl"));
     CHECK_RES(create_shader(&compass_shader, "compass_vertex.glsl", NULL, "compass_fragment.glsl"));
+    CHECK_RES(create_shader(&cuboid_shader, "block_vertex.glsl", "block_geometry.glsl", "block_fragment.glsl"));
     CHECK_RES(create_shader(&fb_shader, "fb_vertex.glsl", "fb_geometry.glsl", "fb_fragment.glsl"));
 
     view_loc = glGetUniformLocation(base_shader, "view");
@@ -364,6 +397,82 @@ void render_objects(FloatDArray os, GLuint VAO, GLuint VBO)
 }
 
 
+// TODO use a pool for these instead of making them fresh each time a chunk is loaded
+void* gen_chunk_gl_data(ChunkGLData **data_p) {
+    assert(data_p);
+    ChunkGLData *data = calloc(1, sizeof(ChunkGLData));
+    assert(data);
+    *data_p = data;
+
+    glGenBuffers(1, &data->VBO);
+    glGenVertexArrays(1, &data->VAO);
+    glBindVertexArray(data->VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, data->VBO);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (GLvoid*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (GLvoid*)(4 * sizeof(GLfloat)));
+    glEnableVertexAttribArray(1);
+
+    glBufferData(GL_ARRAY_BUFFER, MAX_CUBES_IN_CHUNK * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+    return glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
+}
+
+void finish_chunk_gl_data(ChunkGLData *data, size_t cubes_written) {
+    assert(data);
+    glUnmapBuffer(GL_ARRAY_BUFFER);
+    data->len = cubes_written;
+    printf("wrote %lu\n", cubes_written);
+}
+
+
+void render_cuboids(/*const*/ ChunkGLData **data, const CuboidShaderData* uniforms) {
+    assert(data);
+    assert(uniforms);
+
+    // TODO make these not per-frame
+    GLint loc;
+
+    loc = glGetUniformLocation(cuboid_shader, "base_pos");
+    //assert(loc != -1);
+    glUniform4fv(loc, 1, uniforms->base_pos);
+    //printf("base_pos %d %f %f %f %f\n", loc, uniforms->base_pos[0], uniforms->base_pos[1], uniforms->base_pos[2], uniforms->base_pos[3]);
+    loc = glGetUniformLocation(cuboid_shader, "normal");
+    //assert(loc != -1);
+    glUniform4fv(loc, 1, uniforms->normal);
+    loc = glGetUniformLocation(cuboid_shader, "right");
+    //assert(loc != -1);
+    glUniform4fv(loc, 1, uniforms->right);
+    loc = glGetUniformLocation(cuboid_shader, "up");
+    //assert(loc != -1);
+    glUniform4fv(loc, 1, uniforms->up);
+    loc = glGetUniformLocation(cuboid_shader, "front");
+    //assert(loc != -1);
+    glUniform4fv(loc, 1, uniforms->front);
+
+    loc = glGetUniformLocation(cuboid_shader, "adjacent_corners");
+    //assert(loc == 5);
+    printf("base_pos %d %d %d %d %d %d\n", loc, glGetError(), uniforms->adjacent_corners[0], uniforms->adjacent_corners[1], uniforms->adjacent_corners[2], uniforms->adjacent_corners[3]);
+    if (loc != -1) {
+        for (size_t i = 0; i < 12; i++) {
+            glUniform2iv(loc + i, 1, &uniforms->adjacent_corners[i * 2]);
+        }
+    }
+
+    loc = glGetUniformLocation(cuboid_shader, "view");
+    //assert(loc != -1);
+    glUniformMatrix4fv(loc, 1, GL_FALSE, uniforms->view);
+    loc = glGetUniformLocation(cuboid_shader, "projection");
+    //assert(loc != -1);
+    glUniformMatrix4fv(loc, 1, GL_FALSE, uniforms->projection);
+
+    for (GLsizei i = 0; data[i] != NULL; i++) {
+        //printf("rendering %d\n", i);
+        glBindVertexArray(data[i]->VAO);
+        glDrawArrays(GL_POINTS, 0, data[i]->len);
+    }
+}
+
+
 void render(void)
 {
     glfwSetWindowTitle(w, title);
@@ -444,6 +553,14 @@ void render(void)
 
     default:
         assert(0);
+    }
+
+    {
+        glUseProgram(cuboid_shader);
+        glViewport(0, 0, width, height);
+        glBindFramebuffer(GL_FRAMEBUFFER, main_fb);
+
+        render_cuboids(cuboid_data, &cuboid_uniforms);
     }
 
 
