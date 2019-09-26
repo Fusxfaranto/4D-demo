@@ -117,6 +117,9 @@ void main()
     //world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(-5, 0, -5, 0), Vec4(1, 3, 1, 1));
     //world.scene ~= tesseract!(true)(Vec4(0, 1, 1, 0.5), Vec4(1, 1, 1, 1));
 
+
+    //world.scene ~= tesseract(Vec4(1, 1, 1, 0));
+
     view_mat = look_at(Vec3(0, 0, 3), Vec3(0, 0, 0), Vec3(0, 1, 0));
     view = view_mat.data;
     projection = projection_mat.data;
@@ -180,7 +183,8 @@ void main()
         screen_text_data[0].x_scale = 0.0005;
         screen_text_data[0].y_scale = 0.0005;
         screen_text_data[0].line_spacing = 0.1;
-        screen_text_data[0].a = [title_str.ptr];
+        screen_text_data[0].a.unsafe_reset();
+        screen_text_data[0].a ~= title_str.ptr;
 
         screen_text_data[1].x = -0.6;
         screen_text_data[1].y = 1;
@@ -190,7 +194,7 @@ void main()
         final switch (text_display)
         {
         case TextDisplay.NONE:
-            screen_text_data[1].a = [];
+            screen_text_data[1].a.unsafe_reset();
             break;
 
         case TextDisplay.BLOCK:
@@ -212,8 +216,7 @@ void main()
                 ];
             break;
         }
-        scratch_strings.length = 0;
-        scratch_strings.assumeSafeAppend();
+        scratch_strings.unsafe_reset();
         debug(prof) profile_checkpoint();
 
         Vec4 flat_front = (char_front - proj(char_front, global_up)).normalized();
@@ -239,7 +242,7 @@ void main()
         compass = compass_.data();
         debug(prof) profile_checkpoint();
 
-        float render_radius = 70;
+        float render_radius = 90;
         load_chunks(char_pos, cast(int)(render_radius / CHUNK_SIZE) + 1, world.loaded_chunks);
 
         //scratch_strings ~= to!string(world.loaded_chunks.length);

@@ -21,6 +21,7 @@ DC := dmd
 
 CFLAGS := -m64 -g -c -O3 -std=c11 -pedantic -Wall -Werror -Wno-error=unused-variable #-I/usr/include/freetype2/ #-Iftgl/src/
 DFLAGS := -m64 -g -c -O -profile=gc -debug=prof
+#DFLAGS := -vgc
 #LDFLAGS := -Llib -lm -lSOIL -lGLEW -lglfw -lGL
 LDFLAGS := -L-Llib -L-lm -L-lSOIL -L-lGLEW -L-lglfw -L-lGL
 

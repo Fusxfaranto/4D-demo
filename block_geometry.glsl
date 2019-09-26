@@ -3,7 +3,7 @@
 layout(points) in;
 
 // TODO max_vertices??
-layout(triangle_strip, max_vertices = 24) out;
+layout(triangle_strip, max_vertices = 6) out;
 
 in VertexData {
     vec4 rel_corner;
@@ -97,22 +97,32 @@ const vec3[8] colors = {
 
 void main()
 {
-    // TODO in theory we could sometimes cull early here, but does that even improve perf?
-
     // TODO these get compiled out, right??
     vec4 pos = gl_in[0].gl_Position;
     vec4 rel_corner = vertex_data[0].rel_corner;
 
     int unsigned_orientation = int(dot(step(0, -abs(rel_corner)), vec4(0, 1, 2, 3)));
+    bool negative_orientation = dot(rel_corner, vec4(1, 1, 1, 1)) < 0;
+    int signed_orientation = int(negative_orientation) * 4 + unsigned_orientation;
 
     vec4 rel_pos_v = pos - base_pos;
+
+    if (false) {
+        vec4 rel_center = rel_pos_v + vec4(0.5, 0.5, 0.5, 0.5);
+        if (abs(dot(rel_center, normal)) > 1 || dot(rel_center, front) > 1) {
+            EndPrimitive();
+            return;
+        }
+    }
 
     mat4[2] rel_pos;
     bvec4[2] pos_side;
 
     // TODO can we skip this entirely, and instead calculate the intersection point for *every* edge and throw away the nonsense (i.e. nonintersecting) results?
     for (int i = 0; i < 2; i++) {
+        float negative_orientation_factor = negative_orientation ? -1 : 1;
         if (false) {
+            // TODO negative_orientation
             rel_pos[i] = matrixCompMult(
                 corner_offsets[unsigned_orientation][i],
                 mat4(rel_corner, rel_corner, rel_corner, rel_corner)
@@ -120,7 +130,7 @@ void main()
             pos_side[i] = greaterThan(rel_pos[i] * normal, vec4(0));
         } else {
             for (int j = 0; j < 4; j++) {
-                rel_pos[i][j] = corner_offsets[unsigned_orientation][i][j] + rel_pos_v;
+                rel_pos[i][j] = negative_orientation_factor * corner_offsets[unsigned_orientation][i][j] + rel_pos_v;
                 pos_side[i][j] = dot(rel_pos[i][j], normal) > 0;
             }
         }
@@ -147,7 +157,7 @@ void main()
                     );
 
                 gl_Position = projection * view * untransformed_vtx;
-                color_f = colors[unsigned_orientation];
+                color_f = colors[signed_orientation];
                 EmitVertex(); // TODO going to need to be much smarter than this
             }
         }

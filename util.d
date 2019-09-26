@@ -60,3 +60,25 @@ void swap(T)(ref T a, ref T b)
     a = b;
     b = t;
 }
+
+
+void unsafe_reset(T)(ref T[] a) {
+    auto c = a.capacity;
+    a.length = 0;
+    a.assumeSafeAppend();
+    assert(a.capacity == c, c.to!string() ~ " " ~ a.capacity.to!string());
+}
+
+void unsafe_popback(T)(ref T[] a) {
+    auto c = a.capacity;
+    a.length = a.length - 1;
+    a.assumeSafeAppend();
+    assert(a.capacity == c, c.to!string() ~ " " ~ a.capacity.to!string());
+}
+
+void unsafe_assign(alias init, T)(ref T[] a) {
+    a.unsafe_reset();
+    static foreach (i, e; init) {
+        a[i] = init[i];
+    }
+}

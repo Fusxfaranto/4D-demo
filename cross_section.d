@@ -16,6 +16,11 @@ import chunk;
 import world;
 
 
+private {
+    ChunkPos[] cs_stack;
+    ChunkPos[] processed_cps;
+}
+
 
 // TODO there is still allocations (and therefore GC) happening in this function at steady state.  array literals are probably the culprit
 
@@ -27,15 +32,12 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
     objects.length = 0;
     objects.assumeSafeAppend();
 
-    static ChunkPos[] cs_stack;
-    static ChunkPos[] processed_cps;
-
     assert(processed_cps.length == 0);
 
     ChunkPos center_cp = coords_to_chunkpos(base_pos);
-    cs_stack.length = 1;
-    cs_stack.assumeSafeAppend();
-    cs_stack[0] = center_cp;
+    cs_stack.reserve(256); // TODO ???
+    cs_stack.unsafe_reset();
+    cs_stack ~= center_cp;
 
     void process_cube(Vec4 pos, Vec4BasisSigned dir)
     {
@@ -407,7 +409,7 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
     while (!cs_stack.empty())
     {
         ChunkPos cp = cs_stack.back();
-        cs_stack.popBack();
+        cs_stack.unsafe_popback();
 
         for (int i = 0; i < 8; i++)
         {
@@ -440,6 +442,7 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
                 continue;
             }
 
+            //writeln(cs_stack.length, ' ', cs_stack.capacity);
             Chunk* p = new_cp in world.loaded_chunks;
             if (p && p.status == ChunkStatus.NOT_PROCESSED)
             {
@@ -448,6 +451,8 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
                 process_chunk(*p, new_cp);
                 //debug(prof) sw.start();
             }
+            //writeln(cs_stack.length, ' ', cs_stack.capacity);
+            //writeln();
         }
     }
 
@@ -456,8 +461,7 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
     {
         world.loaded_chunks[cp].status = ChunkStatus.NOT_PROCESSED;
     }
-    processed_cps.length = 0;
-    processed_cps.assumeSafeAppend();
+    processed_cps.unsafe_reset();
 
     //writeln(objects[0..10]);
     debug(prof) profile_checkpoint();
@@ -497,12 +501,12 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
                         }
 
                         // http://stackoverflow.com/questions/23472048/projecting-3d-points-to-2d-plane i guess
-                        objects ~= [
-                            dot_p(right, rel_intersection_point),
-                            dot_p(up, rel_intersection_point),
-                            dot_p(front, rel_intersection_point),
-                            tet[i].color_r, tet[i].color_g, tet[i].color_b
-                            ];
+                        objects ~= dot_p(right, rel_intersection_point);
+                        objects ~= dot_p(up, rel_intersection_point);
+                        objects ~= dot_p(front, rel_intersection_point);
+                        objects ~= tet[i].color_r;
+                        objects ~= tet[i].color_g;
+                        objects ~= tet[i].color_b;
                         verts_added++;
                     }
                 }

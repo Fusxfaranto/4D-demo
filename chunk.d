@@ -22,7 +22,7 @@ enum Z_SPAN(int N) = (2 ^^ N) * CHUNK_SIZE;
 enum Y_SPAN(int N) = (2 ^^ N) * (CHUNK_SIZE ^^ 2);
 
 
-enum BlockType
+enum BlockType : ubyte
 {
     NONE,
     TEST,
@@ -161,15 +161,14 @@ struct Chunk
         scope(exit) finish_chunk_gl_data(gl_data, (vert_data - vert_data_init) / 8);
 
         // TODO uhh not this
-        enum N = HDTREE_N;
         const(BlockType)* b = begin();
-        for (size_t x = 0; x < 2 ^^ N; x++, b += CHUNK_SIZE ^^ 3 - Y_SPAN!N)
+        for (size_t x = 0; x < CHUNK_SIZE; x++)
         {
-            for (size_t y = 0; y < 2 ^^ N; y++, b += CHUNK_SIZE ^^ 2 - Z_SPAN!N)
+            for (size_t y = 0; y < CHUNK_SIZE; y++)
             {
-                for (size_t z = 0; z < 2 ^^ N; z++, b += CHUNK_SIZE - W_SPAN!N)
+                for (size_t z = 0; z < CHUNK_SIZE; z++)
                 {
-                    for (size_t w = 0; w < 2 ^^ N; w++, b++)
+                    for (size_t w = 0; w < CHUNK_SIZE; w++, b++)
                     {
                         assert(IndexVec4(x, y, z, w).to_index() == b - begin());
 
@@ -189,20 +188,36 @@ struct Chunk
                             Vec4 rel_corner;
                             final switch (dir)
                             {
-                            case Vec4BasisSigned.X: case Vec4BasisSigned.NX:
+                            case Vec4BasisSigned.NX:
                                 rel_corner = Vec4(0, 1, 1, 1);
                                 break;
 
-                            case Vec4BasisSigned.Y: case Vec4BasisSigned.NY:
+                            case Vec4BasisSigned.NY:
                                 rel_corner = Vec4(1, 0, 1, 1);
                                 break;
 
-                            case Vec4BasisSigned.Z: case Vec4BasisSigned.NZ:
+                            case Vec4BasisSigned.NZ:
                                 rel_corner = Vec4(1, 1, 0, 1);
                                 break;
 
-                            case Vec4BasisSigned.W: case Vec4BasisSigned.NW:
+                            case Vec4BasisSigned.NW:
                                 rel_corner = Vec4(1, 1, 1, 0);
+                                break;
+
+                            case Vec4BasisSigned.X:
+                                rel_corner = Vec4(0, -1, -1, -1);
+                                break;
+
+                            case Vec4BasisSigned.Y:
+                                rel_corner = Vec4(-1, 0, -1, -1);
+                                break;
+
+                            case Vec4BasisSigned.Z:
+                                rel_corner = Vec4(-1, -1, 0, -1);
+                                break;
+
+                            case Vec4BasisSigned.W:
+                                rel_corner = Vec4(-1, -1, -1, 0);
                                 break;
                             }
 
@@ -212,37 +227,40 @@ struct Chunk
                             *vert_data++ = rel_corner.w;
                         }
 
-                        if (b - CHUNK_SIZE ^^ 3 < begin() || b[-(CHUNK_SIZE ^^ 3)] == BlockType.NONE)
+                        if (x == 0 || x == CHUNK_SIZE - 1 || b[-(CHUNK_SIZE ^^ 3)] == BlockType.NONE)
                         {
                             process_cube(block_pos, Vec4BasisSigned.NX);
                         }
-                        if (b - CHUNK_SIZE ^^ 2 < begin() || b[-(CHUNK_SIZE ^^ 2)] == BlockType.NONE)
+                        if (y == 0 || y == CHUNK_SIZE - 1 || b[-(CHUNK_SIZE ^^ 2)] == BlockType.NONE)
                         {
                             process_cube(block_pos, Vec4BasisSigned.NY);
                         }
-                        if (b - CHUNK_SIZE ^^ 1 < begin() || b[-(CHUNK_SIZE ^^ 1)] == BlockType.NONE)
+                        if (z == 0 || z == CHUNK_SIZE - 1 || b[-(CHUNK_SIZE ^^ 1)] == BlockType.NONE)
                         {
                             process_cube(block_pos, Vec4BasisSigned.NZ);
                         }
-                        if (b - CHUNK_SIZE ^^ 0 < begin() || b[-(CHUNK_SIZE ^^ 0)] == BlockType.NONE)
+                        if (w == 0 || w == CHUNK_SIZE - 1 || b[-(CHUNK_SIZE ^^ 0)] == BlockType.NONE)
                         {
                             process_cube(block_pos, Vec4BasisSigned.NW);
                         }
-                        if (b + CHUNK_SIZE ^^ 3 >= end() || b[CHUNK_SIZE ^^ 3] == BlockType.NONE)
+
+                        block_pos += Vec4(1, 1, 1, 1);
+
+                        if (x == 0 || x == CHUNK_SIZE - 1 || b[CHUNK_SIZE ^^ 3] == BlockType.NONE)
                         {
-                            process_cube(block_pos + Vec4(1, 0, 0, 0), Vec4BasisSigned.X);
+                            process_cube(block_pos, Vec4BasisSigned.X);
                         }
-                        if (b + CHUNK_SIZE ^^ 2 >= end() || b[CHUNK_SIZE ^^ 2] == BlockType.NONE)
+                        if (y == 0 || y == CHUNK_SIZE - 1 || b[CHUNK_SIZE ^^ 2] == BlockType.NONE)
                         {
-                            process_cube(block_pos + Vec4(0, 1, 0, 0), Vec4BasisSigned.Y);
+                            process_cube(block_pos, Vec4BasisSigned.Y);
                         }
-                        if (b + CHUNK_SIZE ^^ 1 >= end() || b[CHUNK_SIZE ^^ 1] == BlockType.NONE)
+                        if (z == 0 || z == CHUNK_SIZE - 1 || b[CHUNK_SIZE ^^ 1] == BlockType.NONE)
                         {
-                            process_cube(block_pos + Vec4(0, 0, 1, 0), Vec4BasisSigned.Z);
+                            process_cube(block_pos, Vec4BasisSigned.Z);
                         }
-                        if (b + CHUNK_SIZE ^^ 0 >= end() || b[CHUNK_SIZE ^^ 0] == BlockType.NONE)
+                        if (w == 0 || w == CHUNK_SIZE - 1 || b[CHUNK_SIZE ^^ 0] == BlockType.NONE)
                         {
-                            process_cube(block_pos + Vec4(0, 0, 0, 1), Vec4BasisSigned.W);
+                            process_cube(block_pos, Vec4BasisSigned.W);
                         }
                     }
                 }
@@ -383,11 +401,14 @@ Chunk gen_fixed_chunk()
             {
                 for (size_t w = 0; w < CHUNK_SIZE; w++, b++)
                 {
+                    enum n = 11;
                     //if (w == x && w == y && w == z)
                     //if (x < 8 && y < 8 && z < 8 && w < 8)
-                    //if (x < 4 && y < 4 && z < 4 && w < 4)
-                    if ((b - &c.data[0]) % 1755 == 0)
+                    //if (x < n && y < n && z < n && w < n)
+                    //if ((b - &c.data[0]) % 1755 == 0)
+                    if ((b - &c.data[0]) % 37 == 8)
                     //if (w == x && w == y && w == z && w == 0)
+                    //if ((x != 0) + (y != 0) + (z != 0) + (w != 0) <= 1)
                     {
                         *b = BlockType.TEST;
                     }
@@ -406,7 +427,7 @@ Chunk fetch_chunk(ChunkPos loc)
 
     Chunk c;
 
-    if (//true ||
+    if (true ||
         loc == ChunkPos(0, 0, 0, 0)
         )
     {
@@ -434,25 +455,28 @@ void load_chunks(Vec4 center, int l1_radius, ref Chunk[ChunkPos] loaded_chunks)
 {
     static ChunkPos[] load_stack;
     load_stack.length = 0;
+    load_stack.assumeSafeAppend();
 
-    GC.disable();
-    scope(exit) GC.enable();
+    //GC.disable();
+    //scope(exit) GC.enable();
 
     ChunkPos center_cp = coords_to_chunkpos(center);
     //if (center_cp in loaded_chunks)
     if (true)
     {
-        foreach (i, start_cp; [
-                     center_cp.shift!"x"(l1_radius),
-                     center_cp.shift!"y"(l1_radius),
-                     center_cp.shift!"z"(l1_radius),
-                     center_cp.shift!"w"(l1_radius),
-                     center_cp.shift!"x"(-l1_radius),
-                     center_cp.shift!"y"(-l1_radius),
-                     center_cp.shift!"z"(-l1_radius),
-                     center_cp.shift!"w"(-l1_radius),
-                     ])
+        for (int i = 0; i < 8; i++)
         {
+            ChunkPos start_cp = void;
+            final switch (i) {
+            case 0: start_cp = center_cp.shift!"x"(1); break;
+            case 1: start_cp = center_cp.shift!"y"(1); break;
+            case 2: start_cp = center_cp.shift!"z"(1); break;
+            case 3: start_cp = center_cp.shift!"w"(1); break;
+            case 4: start_cp = center_cp.shift!"x"(-1); break;
+            case 5: start_cp = center_cp.shift!"y"(-1); break;
+            case 6: start_cp = center_cp.shift!"z"(-1); break;
+            case 7: start_cp = center_cp.shift!"w"(-1); break;
+            }
             if (start_cp !in loaded_chunks)
             {
                 load_stack ~= start_cp;
@@ -479,17 +503,19 @@ void load_chunks(Vec4 center, int l1_radius, ref Chunk[ChunkPos] loaded_chunks)
         writeln("loaded ", cp);
         debug(prof) profile_checkpoint();
 
-        foreach (new_cp; [
-                     cp.shift!"x"(1),
-                     cp.shift!"y"(1),
-                     cp.shift!"z"(1),
-                     cp.shift!"w"(1),
-                     cp.shift!"x"(-1),
-                     cp.shift!"y"(-1),
-                     cp.shift!"z"(-1),
-                     cp.shift!"w"(-1),
-                     ])
+        for (int i = 0; i < 8; i++)
         {
+            ChunkPos new_cp = void;
+            final switch (i) {
+            case 0: new_cp = cp.shift!"x"(1); break;
+            case 1: new_cp = cp.shift!"y"(1); break;
+            case 2: new_cp = cp.shift!"z"(1); break;
+            case 3: new_cp = cp.shift!"w"(1); break;
+            case 4: new_cp = cp.shift!"x"(-1); break;
+            case 5: new_cp = cp.shift!"y"(-1); break;
+            case 6: new_cp = cp.shift!"z"(-1); break;
+            case 7: new_cp = cp.shift!"w"(-1); break;
+            }
             //writeln("try to queue ", new_cp);
             if (chunkpos_l1_dist(center_cp, new_cp) <= l1_radius && new_cp !in loaded_chunks)
             {

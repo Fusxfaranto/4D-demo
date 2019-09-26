@@ -61,7 +61,7 @@ GLuint compass_tex;
 
 
 // TODO ???
-#define MAX_CUBES_IN_CHUNK (16 << 3)
+#define MAX_CUBES_IN_CHUNK (16 * 16 * 16 * 16)
 typedef struct ChunkGLData {
     GLuint VAO;
     GLuint VBO;
@@ -174,7 +174,7 @@ int init(void)
     glfwMakeContextCurrent(w);
 
     // TODO: figure out cross-platform shit for vsync and shit
-    glfwSwapInterval(1);
+    glfwSwapInterval(0);
 
 
     glewExperimental = GL_TRUE;
@@ -413,13 +413,14 @@ void* gen_chunk_gl_data(ChunkGLData **data_p) {
     glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (GLvoid*)(4 * sizeof(GLfloat)));
     glEnableVertexAttribArray(1);
 
-    glBufferData(GL_ARRAY_BUFFER, MAX_CUBES_IN_CHUNK * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, MAX_CUBES_IN_CHUNK * 8 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
     return glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
 }
 
 void finish_chunk_gl_data(ChunkGLData *data, size_t cubes_written) {
     assert(data);
     glUnmapBuffer(GL_ARRAY_BUFFER);
+    assert(cubes_written <= MAX_CUBES_IN_CHUNK);
     data->len = cubes_written;
     printf("wrote %lu\n", cubes_written);
 }
@@ -433,25 +434,25 @@ void render_cuboids(/*const*/ ChunkGLData **data, const CuboidShaderData* unifor
     GLint loc;
 
     loc = glGetUniformLocation(cuboid_shader, "base_pos");
-    //assert(loc != -1);
+    assert(loc != -1);
     glUniform4fv(loc, 1, uniforms->base_pos);
     //printf("base_pos %d %f %f %f %f\n", loc, uniforms->base_pos[0], uniforms->base_pos[1], uniforms->base_pos[2], uniforms->base_pos[3]);
     loc = glGetUniformLocation(cuboid_shader, "normal");
-    //assert(loc != -1);
+    assert(loc != -1);
     glUniform4fv(loc, 1, uniforms->normal);
     loc = glGetUniformLocation(cuboid_shader, "right");
-    //assert(loc != -1);
+    assert(loc != -1);
     glUniform4fv(loc, 1, uniforms->right);
     loc = glGetUniformLocation(cuboid_shader, "up");
-    //assert(loc != -1);
+    assert(loc != -1);
     glUniform4fv(loc, 1, uniforms->up);
     loc = glGetUniformLocation(cuboid_shader, "front");
-    //assert(loc != -1);
+    assert(loc != -1);
     glUniform4fv(loc, 1, uniforms->front);
 
     loc = glGetUniformLocation(cuboid_shader, "adjacent_corners");
-    //assert(loc == 5);
-    printf("base_pos %d %d %d %d %d %d\n", loc, glGetError(), uniforms->adjacent_corners[0], uniforms->adjacent_corners[1], uniforms->adjacent_corners[2], uniforms->adjacent_corners[3]);
+    assert(loc == 5);
+    //printf("base_pos %d %d %d %d %d %d\n", loc, glGetError(), uniforms->adjacent_corners[0], uniforms->adjacent_corners[1], uniforms->adjacent_corners[2], uniforms->adjacent_corners[3]);
     if (loc != -1) {
         for (size_t i = 0; i < 12; i++) {
             glUniform2iv(loc + i, 1, &uniforms->adjacent_corners[i * 2]);
@@ -459,10 +460,10 @@ void render_cuboids(/*const*/ ChunkGLData **data, const CuboidShaderData* unifor
     }
 
     loc = glGetUniformLocation(cuboid_shader, "view");
-    //assert(loc != -1);
+    assert(loc == 17);
     glUniformMatrix4fv(loc, 1, GL_FALSE, uniforms->view);
     loc = glGetUniformLocation(cuboid_shader, "projection");
-    //assert(loc != -1);
+    assert(loc == 18);
     glUniformMatrix4fv(loc, 1, GL_FALSE, uniforms->projection);
 
     for (GLsizei i = 0; data[i] != NULL; i++) {
