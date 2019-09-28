@@ -180,6 +180,9 @@ struct Chunk
                         Vec4 block_pos = Vec4(x, y, z, w) + loc.to_vec4();
 
                         void process_cube(Vec4 pos, Vec4BasisSigned dir) {
+                            // TODO debug
+                            if (dir != Vec4BasisSigned.Y) return;
+
                             *vert_data++ = pos.x;
                             *vert_data++ = pos.y;
                             *vert_data++ = pos.z;
@@ -427,8 +430,9 @@ Chunk fetch_chunk(ChunkPos loc)
 
     Chunk c;
 
-    if (true ||
-        loc == ChunkPos(0, 0, 0, 0)
+    if (//true ||
+        //loc == ChunkPos(0, 0, 0, 0) ||
+        loc.y < 0
         )
     {
         if (!fixed_chunk)

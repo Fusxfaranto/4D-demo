@@ -3,7 +3,7 @@
 layout(points) in;
 
 // TODO max_vertices??
-layout(triangle_strip, max_vertices = 6) out;
+layout(triangle_strip, max_vertices = 9) out;
 
 in VertexData {
     vec4 rel_corner;
@@ -95,6 +95,7 @@ const vec3[8] colors = {
     vec3(.7, .7, .7)
 };
 
+
 void main()
 {
     // TODO these get compiled out, right??
@@ -137,6 +138,9 @@ void main()
     }
 
     if (true) {
+        int num_verts_set = 0;
+        vec4 first_vert_pos;
+
         for (int i = 0; i < 12; i++) {
             int corner_a = adjacent_corners[i][0];
             int corner_ah = corner_a >> 2;
@@ -145,6 +149,11 @@ void main()
             int corner_bh = corner_b >> 2;
             int corner_bl = corner_b & 3;
             if (pos_side[corner_ah][corner_al] != pos_side[corner_bh][corner_bl]) {
+                if (num_verts_set > 1) {
+                    gl_Position = first_vert_pos;
+                    color_f = colors[signed_orientation];
+                    EmitVertex();
+                }
                 vec4 diff = rel_pos[corner_ah][corner_al] - rel_pos[corner_bh][corner_bl];
                 float scale = dot(rel_pos[corner_ah][corner_al], normal) * -1.0 / dot(normal, diff);
                 vec4 rel_intersection_point = rel_pos[corner_ah][corner_al] + scale * diff;
@@ -156,10 +165,16 @@ void main()
                     1
                     );
 
-                gl_Position = projection * view * untransformed_vtx;
-                color_f = colors[signed_orientation];
-                EmitVertex(); // TODO going to need to be much smarter than this
+                if (num_verts_set > 0) {
+                    gl_Position = projection * view * untransformed_vtx;
+                    color_f = colors[signed_orientation];
+                    EmitVertex();
+                } else {
+                    first_vert_pos = projection * view * untransformed_vtx;
+                }
+                num_verts_set++;
             }
+
         }
     } else if (true) {
         for (int i = 0; i < 2; i++) {
@@ -213,48 +228,52 @@ void main()
             }
         }
     } else {
-            vec4 v = vec4(1, 1, 1, 1);
+        vec4 v = vec4(1, 1, 1, 1);
 
 
-            if (adjacent_corners[9][0] != 4) {
-                v.x = 0;
-            }
-            if (adjacent_corners[9][1] != 7) {
-                v.y = 0;
-            }
-            if (adjacent_corners[11][0] != 6) {
-                v.z = 0;
-            }
-            if (adjacent_corners[11][1] != 7) {
-                v.w = 0;
-            }
+        if (adjacent_corners[9][0] != 4) {
+            v.x = 0;
+        }
+        if (adjacent_corners[9][1] != 7) {
+            v.y = 0;
+        }
+        if (adjacent_corners[11][0] != 6) {
+            v.z = 0;
+        }
+        if (adjacent_corners[11][1] != 7) {
+            v.w = 0;
+        }
 
 
-            float offset = 0;
+        float offset = 0;
 
-            gl_Position = vec4(-0.5 + offset, -1, 0, 1);
-            color_f = vec3(v.x, v.x, v.x);
-            EmitVertex();
-            gl_Position = vec4(-0.5 + offset, -1, 0, 1);
-            color_f = vec3(v.x, v.x, v.x);
-            EmitVertex();
+        gl_Position = vec4(-0.5 + offset, -1, 0, 1);
+        color_f = vec3(v.x, v.x, v.x);
+        EmitVertex();
+        gl_Position = vec4(-0.5 + offset, -1, 0, 1);
+        color_f = vec3(v.x, v.x, v.x);
+        EmitVertex();
 
-            gl_Position = vec4(-0.5 + offset, -0.5, 0, 1);
-            color_f = vec3(v.y, v.y, v.y);
-            EmitVertex();
+        gl_Position = vec4(-0.5 + offset, -0.5, 0, 1);
+        color_f = vec3(v.y, v.y, v.y);
+        EmitVertex();
 
-            gl_Position = vec4(-1 + offset, -1, 0, 1);
-            color_f = vec3(v.z, v.z, v.z);
-            EmitVertex();
+        gl_Position = vec4(-1 + offset, -1, 0, 1);
+        color_f = vec3(v.z, v.z, v.z);
+        EmitVertex();
 
-            gl_Position = vec4(-1 + offset, -0.5, 0, 1);
-            color_f = vec3(v.w, v.w, v.w);
-            EmitVertex();
-            gl_Position = vec4(-1 + offset, -0.5, 0, 1);
-            color_f = vec3(v.w, v.w, v.w);
-            EmitVertex();
+        gl_Position = vec4(-1 + offset, -0.5, 0, 1);
+        color_f = vec3(v.w, v.w, v.w);
+        EmitVertex();
+        gl_Position = vec4(-1 + offset, -0.5, 0, 1);
+        color_f = vec3(v.w, v.w, v.w);
+        EmitVertex();
     }
 
     EndPrimitive();
 }
+
+
+// TODO make an optimized version of this for each of 1x1 vertical cubes, other 1x1 cubes, cuboids (more?)
+// use some reserved glsl symbol to add some preprocessor nonsense to dedupe
 

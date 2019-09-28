@@ -1,10 +1,10 @@
 
-import std.stdio : writeln;
+import std.stdio : write, writeln;
 import std.conv : to;
 import std.math : PI, sin, cos, acos, sgn, sqrt, abs;
 import std.range : back, popBack;
 import std.array : array, empty;
-import std.algorithm : sum, map;
+import std.algorithm : sum, map, schwartzSort, sort;
 import std.traits : EnumMembers;
 import std.typecons : Tuple, tuple;
 
@@ -27,15 +27,11 @@ private {
 void generate_cross_section(ref World world, ref float[] objects, float render_radius, bool cube_culling,
                             Vec4 base_pos, Vec4 up, Vec4 front, Vec4 normal, Vec4 right)
 {
-    // reset contents without deallocating (in theory at least)
-    // LIES this totally deallocates
-    objects.length = 0;
-    objects.assumeSafeAppend();
+    objects.unsafe_reset();
 
     assert(processed_cps.length == 0);
 
     ChunkPos center_cp = coords_to_chunkpos(base_pos);
-    cs_stack.reserve(256); // TODO ???
     cs_stack.unsafe_reset();
     cs_stack ~= center_cp;
 
@@ -162,8 +158,7 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
         }
 
         static size_t[] verts;
-        verts.length = 0;
-        verts.assumeSafeAppend();
+        verts.unsafe_reset();
 
         foreach (i, t; adjacent_corners)
         {
@@ -519,4 +514,274 @@ void generate_cross_section(ref World world, ref float[] objects, float render_r
     run(world.scene);
     run(world.character);
     debug(prof) profile_checkpoint();
+}
+
+
+immutable int[2][12] reference_adjacent_corners = [
+    [6, 7],
+    [7, 4],
+    [4, 2],
+    [2, 6],
+
+    [3, 6],
+    [5, 7],
+    [1, 4],
+    [0, 2],
+
+    [3, 5],
+    [5, 1],
+    [1, 0],
+    [0, 3],
+
+    // [0, 1],
+    // [0, 2],
+    // [0, 3],
+    // [1, 4],
+    // [1, 5],
+    // [2, 4],
+    // [2, 6],
+    // [3, 5],
+    // [3, 6],
+    // [4, 7],
+    // [5, 7],
+    // [6, 7],
+
+    ];
+
+immutable size_t[3][8] corner_edge_map = [
+    [10, 7, 11],
+    [10, 6, 9],
+    [7,  2, 3],
+    [11, 8, 4],
+    [6,  2, 1],
+    [9,  8, 5],
+    [3,  4, 0],
+    [1,  5, 0],
+
+    // [0, 1, 2],
+    // [0, 3, 4],
+    // [1, 5, 6],
+    // [2, 7, 8],
+    // [3, 5, 9],
+    // [4, 7, 10],
+    // [6, 8, 11],
+    // [9, 10, 11],
+    ];
+
+immutable size_t[3][8] corner_adjacency_map = [
+    [1, 2, 3],
+    [0, 4, 5],
+    [0, 4, 6],
+    [0, 5, 6],
+    [1, 2, 3],
+    [1, 3, 7],
+    [2, 3, 7],
+    [4, 5, 6],
+    ];
+
+immutable Vec4[8] reference_cube = [
+    Vec4(0, 0, 0, 0),
+    Vec4(1, 0, 0, 0),
+    Vec4(0, 0, 1, 0),
+    Vec4(0, 0, 0, 1),
+    Vec4(1, 0, 1, 0),
+    Vec4(1, 0, 0, 1),
+    Vec4(0, 0, 1, 1),
+    Vec4(1, 0, 1, 1),
+    ];
+
+
+// TODO since this is probably going to need to be per-orientation, would it
+// be better to enumerate the edges and order those?  (rather than pairs of corners)
+void order_adjacent_corners(ref int[2][12] adjacent_corners, Vec4 front, Vec4 right) {
+    Vec4[8] projected_corners = void;
+    size_t[8] idxs = void;
+    float[8] corner_dists = void;
+
+    writeln(front);
+    writeln(right);
+
+    foreach (i, v; reference_cube) {
+        idxs[i] = i;
+        projected_corners[i] = proj(v, front);
+        corner_dists[i] = dot_p(projected_corners[i], front);
+        writeln(corner_dists[i], '\t', projected_corners[i]);
+    }
+
+    sort!((a, b) => corner_dists[a] < corner_dists[b])(idxs[]);
+
+    static bool[12] edge_done;
+    edge_done[] = false;
+    size_t progress_front = 0;
+    size_t progress_back = 11;
+
+    for (size_t i = 0; i < 7; i++) {
+        //Vec4 midpoint = 0.5 * (projected_corners[idxs[i]] + projected_corners[idxs[i + 1]]);
+        size_t[3] adjacent_edges = corner_edge_map[idxs[i]];
+        size_t[3] adjacent_edge_corners = corner_adjacency_map[idxs[i]];
+        size_t[3] adjacent_edge_idxs = void;
+        for (size_t j = 0; j < 3; j++) adjacent_edge_idxs[j] = j;
+
+        sort!((a, b) => corner_dists[adjacent_edge_corners[a]] < corner_dists[adjacent_edge_corners[b]])(adjacent_edge_idxs[]);
+
+        foreach (adjacent_edge_idx; adjacent_edge_idxs) {
+            size_t edge_idx = adjacent_edges[adjacent_edge_idx];
+            if (!edge_done[edge_idx]) {
+                int[2] corners = reference_adjacent_corners[edge_idx];
+                Vec4 edge_midpoint = 0.5 * (reference_cube[corners[0]] + reference_cube[corners[1]]);
+
+                if (dot_p(edge_midpoint, right) > 0) {
+                    adjacent_corners[progress_front++] = corners;
+                } else {
+                    adjacent_corners[progress_back--] = corners;
+                }
+
+                edge_done[edge_idx] = true;
+                write(edge_idx, ", ");
+            }
+        }
+    }
+
+    writeln();
+    assert(progress_front - progress_back == 1);
+
+    //writeln(adjacent_corners);
+}
+
+void order_adjacent_corners_alt(ref int[2][12] adjacent_corners, Vec4 normal) {
+    // TODO
+    immutable Vec4 cube_perp = from_basis(Vec4BasisSigned.Y);
+
+    bool[12][12] edge_dag = false;
+
+    writeln(normal);
+
+    Vec4[8] projected_corners = void;
+    size_t[8] idxs = void;
+    float[8] corner_dists = void;
+
+    foreach (i, v; reference_cube) {
+        idxs[i] = i;
+        projected_corners[i] = proj(v, normal);
+        corner_dists[i] = dot_p(projected_corners[i], normal);
+        writeln(corner_dists[i], '\t', projected_corners[i]);
+    }
+
+    sort!((a, b) => corner_dists[a] < corner_dists[b])(idxs[]);
+
+    for (size_t i = 0; i < 7; i++) {
+        Vec4 midpoint = 0.5 * (projected_corners[idxs[i]] + projected_corners[idxs[i + 1]]);
+
+        Vec4[8] rel_pos = void;
+        bool[8] pos_side = void;
+        for (size_t j = 0; j < 8; j++) {
+            rel_pos[j] = reference_cube[j] - midpoint;
+            pos_side[j] = dot_p(rel_pos[j], normal) > 0;
+        }
+
+        Vec4 centroid = Vec4(0, 0, 0, 0);
+        static size_t[] intersecting_edges;
+        intersecting_edges.unsafe_reset();
+        static Vec4[] intersection_points;
+        intersection_points.unsafe_reset();
+        static size_t[] intersection_point_idxs;
+        intersection_point_idxs.unsafe_reset();
+        foreach (j, t; reference_adjacent_corners) {
+            if (pos_side[t[0]] != pos_side[t[1]]) {
+                intersecting_edges ~= j;
+                intersection_point_idxs ~= intersection_point_idxs.length;
+
+                Vec4 diff = rel_pos[t[0]] - rel_pos[t[1]];
+                float d = dot_p(normal, diff);
+                intersection_points ~= rel_pos[t[0]] + diff * (-dot_p(rel_pos[t[0]], normal) / d);
+
+                centroid += intersection_points[$-1];
+            }
+        }
+        centroid = centroid / intersection_points.length;
+
+        assert(intersecting_edges.length == intersection_points.length);
+        assert(intersecting_edges.length == intersection_point_idxs.length);
+
+        if (intersecting_edges.length == 0) {
+            continue; // TODO ??? is this ok
+        }
+
+        sort!((a, b) => dot_p(normal, cross_p(cube_perp, intersection_points[a] - centroid, intersection_points[b] - centroid)) < 0)(intersection_point_idxs);
+
+        for (size_t j = 0; j < intersection_points.length - 1; j++) {
+            size_t idx1 = intersection_point_idxs[j];
+            size_t idx2 = intersection_point_idxs[j + 1];
+            edge_dag[intersecting_edges[idx1]][intersecting_edges[idx2]] = true;
+            write(intersecting_edges[idx1], ", ");
+        }
+        writeln(intersecting_edges[intersection_point_idxs[$-1]]);
+    }
+
+    void print_dag() {
+        for (size_t i = 0; i < 12; i++) {
+            for (size_t j = 0; j < 12; j++) {
+                if (edge_dag[i][j]) {
+                    writeln(i, " ", j);
+                }
+            }
+        }
+        writeln();
+    }
+
+    print_dag();
+
+    static size_t[] start_nodes;
+    start_nodes.unsafe_reset();
+    for (size_t i = 0; i < 12; i++) {
+        bool has_incoming_edge = false;
+        for (size_t j = 0; j < 12; j++) {
+            if (edge_dag[j][i]) {
+                has_incoming_edge = true;
+                break;
+            }
+        }
+        if (!has_incoming_edge) {
+            start_nodes ~= i;
+        }
+    }
+    assert(start_nodes.length > 0);
+
+    static size_t[] edge_ordering;
+    edge_ordering.unsafe_reset();
+    while (start_nodes.length > 0) {
+        size_t n = start_nodes.back();
+        start_nodes.unsafe_popback();
+        edge_ordering ~= n;
+
+        for (size_t i = 0; i < 12; i++) {
+            if (edge_dag[n][i]) {
+                edge_dag[n][i] = false;
+
+                bool has_incoming_edge = false;
+                for (size_t j = 0; j < 12; j++) {
+                    if (edge_dag[j][i]) {
+                        has_incoming_edge = true;
+                        break;
+                    }
+                }
+                if (!has_incoming_edge) {
+                    start_nodes ~= i;
+                }
+            }
+        }
+    }
+
+    print_dag();
+
+    for (size_t i = 0; i < 12; i++) {
+        for (size_t j = 0; j < 12; j++) {
+            assert(!edge_dag[i][j]);
+        }
+    }
+    assert(edge_ordering.length == 12);
+
+    for (size_t i = 0; i < 12; i++) {
+        adjacent_corners[i] = reference_adjacent_corners[edge_ordering[i]];
+    }
 }

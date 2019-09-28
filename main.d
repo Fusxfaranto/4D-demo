@@ -48,21 +48,7 @@ string[] scratch_strings;
 //Vec4[2] test_plane = [Vec4(0.5, 0.5, 0.5, 0.5), Vec4(-0.5, -0.5, 0.5, 0.5)];
 //float test_angle = 0;
 
-int[2][12] adjacent_corners = [
-    [0, 1],
-    [0, 2],
-    [0, 3],
-    [1, 4],
-    [1, 5],
-    [2, 4],
-    [2, 6],
-    [3, 5],
-    [3, 6],
-    [4, 7],
-    [5, 7],
-    [6, 7],
-    ];
-
+int[2][12] adjacent_corners;
 
 bool do_close = false;
 
@@ -242,7 +228,7 @@ void main()
         compass = compass_.data();
         debug(prof) profile_checkpoint();
 
-        float render_radius = 90;
+        float render_radius = 60;
         load_chunks(char_pos, cast(int)(render_radius / CHUNK_SIZE) + 1, world.loaded_chunks);
 
         //scratch_strings ~= to!string(world.loaded_chunks.length);
@@ -262,6 +248,9 @@ void main()
 
         case DisplayMode.NORMAL:
         {
+            order_adjacent_corners(adjacent_corners, char_front, char_right);
+            order_adjacent_corners_alt(adjacent_corners, char_normal);
+
             {
                 // TODO don't do these each frame
                 cuboid_uniforms.base_pos = char_pos.data();
@@ -403,9 +392,17 @@ extern (C) void key_callback(GLFWwindow* window, int key, int scancode, int acti
 
     case GLFWKey.GLFW_KEY_3:
     {
-        char_front = Vec4(0, 0, 1, 0);
-        char_up = Vec4(0, 0, 0, 1);
-        char_normal = Vec4(0, 1, 0, 0);
+        char_front = Vec4(0, 0, -1, 1).normalized();
+        char_up = Vec4(0, 1, 0, 0).normalized();
+        char_normal = Vec4(1, 0, -1, -1).normalized();
+        break;
+    }
+
+    case GLFWKey.GLFW_KEY_4:
+    {
+        char_front = Vec4(0, 0, -1, 1).normalized();
+        char_up = Vec4(0, 1, 0, 0).normalized();
+        char_normal = Vec4(1, 0, 1, 1).normalized();
         break;
     }
 
