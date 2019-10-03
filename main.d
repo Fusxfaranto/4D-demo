@@ -48,7 +48,7 @@ string[] scratch_strings;
 //Vec4[2] test_plane = [Vec4(0.5, 0.5, 0.5, 0.5), Vec4(-0.5, -0.5, 0.5, 0.5)];
 //float test_angle = 0;
 
-int[2][12] adjacent_corners;
+int[6][8][8] edge_ordering;
 
 bool do_close = false;
 
@@ -248,8 +248,9 @@ void main()
 
         case DisplayMode.NORMAL:
         {
-            order_adjacent_corners(adjacent_corners, char_front, char_right);
-            order_adjacent_corners_alt(adjacent_corners, char_normal);
+            //order_adjacent_corners(adjacent_corners, char_front, char_right);
+            //order_adjacent_corners_alt(adjacent_corners, char_normal, char_front, char_right);
+            order_edges(edge_ordering, char_normal, char_front, char_right);
 
             {
                 // TODO don't do these each frame
@@ -259,10 +260,10 @@ void main()
                 cuboid_uniforms.up = char_up.data();
                 cuboid_uniforms.front = char_front.data();
 
-                cuboid_uniforms.adjacent_corners = &adjacent_corners[0][0];
-
                 cuboid_uniforms.view = view_mat.data();
                 cuboid_uniforms.projection = projection_mat.data();
+
+                cuboid_uniforms.edge_ordering = &edge_ordering[0][0][0];
             }
 
             //scratch_strings.length = 0;

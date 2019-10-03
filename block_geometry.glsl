@@ -2,15 +2,14 @@
 
 layout(points) in;
 
-// TODO max_vertices??
-layout(triangle_strip, max_vertices = 9) out;
+layout(triangle_strip, max_vertices = 6) out;
 
 in VertexData {
     vec4 rel_corner;
 } vertex_data[];
 
 out FragData {
-    vec3 color_f; 
+    vec3 color_f;
 };
 
 layout(location = 0) uniform vec4 base_pos;
@@ -19,80 +18,81 @@ layout(location = 2) uniform vec4 right;
 layout(location = 3) uniform vec4 up;
 layout(location = 4) uniform vec4 front;
 
-layout(location = 5) uniform ivec2[12] adjacent_corners;
+layout(location = 5) uniform mat4 view;
+layout(location = 6) uniform mat4 projection;
 
-layout(location = 17) uniform mat4 view;
-layout(location = 18) uniform mat4 projection;
+layout(location = 7) uniform int[8][8][6] edge_ordering;
 
 
-const mat4[4][2] corner_offsets = mat4[4][2](
-    mat4[2](
-        mat4(
-            vec4(0, 0, 0, 0),
-            vec4(0, 1, 0, 0),
-            vec4(0, 0, 1, 0),
-            vec4(0, 0, 0, 1)
-            ),
-        mat4(
-            vec4(0, 1, 1, 0),
-            vec4(0, 1, 0, 1),
-            vec4(0, 0, 1, 1),
-            vec4(0, 1, 1, 1)
-            )
-        ),
-    mat4[2](
-        mat4(
-            vec4(0, 0, 0, 0),
-            vec4(1, 0, 0, 0),
-            vec4(0, 0, 1, 0),
-            vec4(0, 0, 0, 1)
-            ),
-        mat4(
-            vec4(1, 0, 1, 0),
-            vec4(1, 0, 0, 1),
-            vec4(0, 0, 1, 1),
-            vec4(1, 0, 1, 1)
-            )
-        ),
-    mat4[2](
-        mat4(
-            vec4(0, 0, 0, 0),
-            vec4(1, 0, 0, 0),
-            vec4(0, 1, 0, 0),
-            vec4(0, 0, 0, 1)
-            ),
-        mat4(
-            vec4(1, 1, 0, 0),
-            vec4(1, 0, 0, 1),
-            vec4(0, 1, 0, 1),
-            vec4(1, 1, 0, 1)
-            )
-        ),
-    mat4[2](
-        mat4(
-            vec4(0, 0, 0, 0),
-            vec4(1, 0, 0, 0),
-            vec4(0, 1, 0, 0),
-            vec4(0, 0, 1, 0)
-            ),
-        mat4(
-            vec4(1, 1, 0, 0),
-            vec4(1, 0, 1, 0),
-            vec4(0, 1, 1, 0),
-            vec4(1, 1, 1, 0)
-            )
-        )
-    );
+const vec4[4][8] corner_offsets = {
+    {
+        vec4(0, 0, 0, 0),
+        vec4(0, 1, 0, 0),
+        vec4(0, 0, 1, 0),
+        vec4(0, 0, 0, 1),
+        vec4(0, 1, 1, 0),
+        vec4(0, 1, 0, 1),
+        vec4(0, 0, 1, 1),
+        vec4(0, 1, 1, 1)
+    },
+    {
+        vec4(0, 0, 0, 0),
+        vec4(1, 0, 0, 0),
+        vec4(0, 0, 1, 0),
+        vec4(0, 0, 0, 1),
+        vec4(1, 0, 1, 0),
+        vec4(1, 0, 0, 1),
+        vec4(0, 0, 1, 1),
+        vec4(1, 0, 1, 1)
+    },
+    {
+        vec4(0, 0, 0, 0),
+        vec4(1, 0, 0, 0),
+        vec4(0, 1, 0, 0),
+        vec4(0, 0, 0, 1),
+        vec4(1, 1, 0, 0),
+        vec4(1, 0, 0, 1),
+        vec4(0, 1, 0, 1),
+        vec4(1, 1, 0, 1)
+    },
+    {
+        vec4(0, 0, 0, 0),
+        vec4(1, 0, 0, 0),
+        vec4(0, 1, 0, 0),
+        vec4(0, 0, 1, 0),
+        vec4(1, 1, 0, 0),
+        vec4(1, 0, 1, 0),
+        vec4(0, 1, 1, 0),
+        vec4(1, 1, 1, 0)
+    }
+};
 
 const vec3[8] colors = {
-    vec3(.0, .8, .0),
-    vec3(.8, .0, .0),
-    vec3(.0, .0, .8),
-    vec3(.0, .8, .8),
-    vec3(.8, .0, .8),
-    vec3(.8, .8, .0),
-    vec3(.2, .2, .2),
-    vec3(.7, .7, .7)
+    vec3(.0, .8, .0), // 0 green
+    vec3(.8, .0, .0), // 1 red
+    vec3(.0, .0, .8), // 2 blue
+    vec3(.0, .8, .8), // 3 cyan
+    vec3(.8, .0, .8), // 4 magenta
+    vec3(.8, .8, .0), // 5 yellow
+    vec3(.2, .2, .2), // 6 black
+    vec3(.7, .7, .7)  // 7 white
+};
+
+const ivec2[12] adjacent_corners = {
+    ivec2(6, 7),
+    ivec2(7, 4),
+    ivec2(4, 2),
+    ivec2(2, 6),
+
+    ivec2(3, 6),
+    ivec2(5, 7),
+    ivec2(1, 4),
+    ivec2(0, 2),
+
+    ivec2(3, 5),
+    ivec2(5, 1),
+    ivec2(1, 0),
+    ivec2(0, 3),
 };
 
 
@@ -116,65 +116,66 @@ void main()
         }
     }
 
-    mat4[2] rel_pos;
-    bvec4[2] pos_side;
+    vec4[8] rel_pos;
+    //bool[8] pos_side;
 
-    // TODO can we skip this entirely, and instead calculate the intersection point for *every* edge and throw away the nonsense (i.e. nonintersecting) results?
-    for (int i = 0; i < 2; i++) {
-        float negative_orientation_factor = negative_orientation ? -1 : 1;
-        if (false) {
-            // TODO negative_orientation
-            rel_pos[i] = matrixCompMult(
-                corner_offsets[unsigned_orientation][i],
-                mat4(rel_corner, rel_corner, rel_corner, rel_corner)
-                ) + mat4(rel_pos_v, rel_pos_v, rel_pos_v, rel_pos_v);
-            pos_side[i] = greaterThan(rel_pos[i] * normal, vec4(0));
-        } else {
-            for (int j = 0; j < 4; j++) {
-                rel_pos[i][j] = negative_orientation_factor * corner_offsets[unsigned_orientation][i][j] + rel_pos_v;
-                pos_side[i][j] = dot(rel_pos[i][j], normal) > 0;
-            }
+    float closest_neg_dist = -1e20;
+    int closest = -1;
+
+    float negative_orientation_factor = negative_orientation ? -1 : 1;
+    for (int i = 0; i < 8; i++) {
+        rel_pos[i] = negative_orientation_factor * corner_offsets[unsigned_orientation][i] + rel_pos_v;
+        //pos_side[i] = dot(rel_pos[i], normal) > 0;
+        // TODO THIS MINUS SIGN SHOULD NOT BE HERE
+        float signed_dist = -dot(rel_pos[i], normal);
+
+        if (signed_dist < 0 && signed_dist > closest_neg_dist) {
+            closest = i;
+            closest_neg_dist = signed_dist;
         }
     }
 
+    if (closest == -1) {
+        EndPrimitive();
+        return;
+    }
+
     if (true) {
-        int num_verts_set = 0;
-        vec4 first_vert_pos;
-
-        for (int i = 0; i < 12; i++) {
-            int corner_a = adjacent_corners[i][0];
-            int corner_ah = corner_a >> 2;
-            int corner_al = corner_a & 3;
-            int corner_b = adjacent_corners[i][1];
-            int corner_bh = corner_b >> 2;
-            int corner_bl = corner_b & 3;
-            if (pos_side[corner_ah][corner_al] != pos_side[corner_bh][corner_bl]) {
-                if (num_verts_set > 1) {
-                    gl_Position = first_vert_pos;
-                    color_f = colors[signed_orientation];
-                    EmitVertex();
-                }
-                vec4 diff = rel_pos[corner_ah][corner_al] - rel_pos[corner_bh][corner_bl];
-                float scale = dot(rel_pos[corner_ah][corner_al], normal) * -1.0 / dot(normal, diff);
-                vec4 rel_intersection_point = rel_pos[corner_ah][corner_al] + scale * diff;
-
-                vec4 untransformed_vtx = vec4(
-                    dot(right, rel_intersection_point),
-                    dot(up, rel_intersection_point),
-                    dot(front, rel_intersection_point),
-                    1
-                    );
-
-                if (num_verts_set > 0) {
-                    gl_Position = projection * view * untransformed_vtx;
-                    color_f = colors[signed_orientation];
-                    EmitVertex();
-                } else {
-                    first_vert_pos = projection * view * untransformed_vtx;
-                }
-                num_verts_set++;
+        for (int i = 0; i < 6; i++) {
+            // TODO use orientation
+            int edge = edge_ordering[0][closest][i];
+            if (edge == -1) {
+                break;
             }
+            
+            int corner_a = adjacent_corners[edge][0];
+            int corner_b = adjacent_corners[edge][1];
+            
+            //color_f = colors[signed_orientation];
+            color_f = colors[closest];
+            //color_f = colors[6];
+            
+            // this is hopefully always true
+            // assert(pos_side[corner_a] != pos_side[corner_b]);
+            // TODO this is totally happening
+            if (sign(dot(rel_pos[corner_a], normal)) == sign(dot(rel_pos[corner_b], normal))) {
+                //break;
+                color_f = vec3(1, 1, 1);
+            }
+            
+            vec4 diff = rel_pos[corner_a] - rel_pos[corner_b];
+            float scale = dot(rel_pos[corner_a], normal) * -1.0 / dot(normal, diff);
+            vec4 rel_intersection_point = rel_pos[corner_a] + scale * diff;
 
+            vec4 untransformed_vtx = vec4(
+                dot(right, rel_intersection_point),
+                dot(up, rel_intersection_point),
+                dot(front, rel_intersection_point),
+                1
+                );
+
+            gl_Position = projection * view * untransformed_vtx;
+            EmitVertex();
         }
     } else if (true) {
         for (int i = 0; i < 2; i++) {
@@ -187,16 +188,16 @@ void main()
             //vec4 v = rel_pos[0] * normal;
             //vec4 v = 0.5 + 0.5 * tanh(0.5 * up);
 
-            if (pos_side[i][0]) {
+            if (edge_ordering[0][i][0] == 0) {
                 v.x = 0;
             }
-            if (pos_side[i][1]) {
+            if (edge_ordering[0][i][1] == 0) {
                 v.y = 0;
             }
-            if (pos_side[i][2]) {
+            if (edge_ordering[0][i][2] == 0) {
                 v.z = 0;
             }
-            if (pos_side[i][3]) {
+            if (edge_ordering[0][i][3] == 0) {
                 v.w = 0;
             }
 
@@ -231,18 +232,18 @@ void main()
         vec4 v = vec4(1, 1, 1, 1);
 
 
-        if (adjacent_corners[9][0] != 4) {
-            v.x = 0;
-        }
-        if (adjacent_corners[9][1] != 7) {
-            v.y = 0;
-        }
-        if (adjacent_corners[11][0] != 6) {
-            v.z = 0;
-        }
-        if (adjacent_corners[11][1] != 7) {
-            v.w = 0;
-        }
+        // if (adjacent_corners[9][0] != 4) {
+        //     v.x = 0;
+        // }
+        // if (adjacent_corners[9][1] != 7) {
+        //     v.y = 0;
+        // }
+        // if (adjacent_corners[11][0] != 6) {
+        //     v.z = 0;
+        // }
+        // if (adjacent_corners[11][1] != 7) {
+        //     v.w = 0;
+        // }
 
 
         float offset = 0;
@@ -276,4 +277,3 @@ void main()
 
 // TODO make an optimized version of this for each of 1x1 vertical cubes, other 1x1 cubes, cuboids (more?)
 // use some reserved glsl symbol to add some preprocessor nonsense to dedupe
-

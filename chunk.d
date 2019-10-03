@@ -411,6 +411,7 @@ Chunk gen_fixed_chunk()
                     //if ((b - &c.data[0]) % 1755 == 0)
                     if ((b - &c.data[0]) % 37 == 8)
                     //if (w == x && w == y && w == z && w == 0)
+                    //if (x < 5 && x % 2 == 0 && w == y && w == z && w == 0)
                     //if ((x != 0) + (y != 0) + (z != 0) + (w != 0) <= 1)
                     {
                         *b = BlockType.TEST;
@@ -431,7 +432,7 @@ Chunk fetch_chunk(ChunkPos loc)
     Chunk c;
 
     if (//true ||
-        //loc == ChunkPos(0, 0, 0, 0) ||
+        loc == ChunkPos(-1, -1, -1, 0) &&
         loc.y < 0
         )
     {

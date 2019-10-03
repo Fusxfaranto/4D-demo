@@ -1,9 +1,10 @@
 import std.stdio : writeln;
 import std.conv : to;
 import std.math : PI, abs, sin, cos, tan, sqrt, acos, isNaN;
-import std.algorithm : min;
+import std.algorithm : min, maxElement;
+import std.traits : EnumMembers;
 
-import util : format;
+import util;
 
 
 float deg_to_rad(float n)
@@ -158,7 +159,25 @@ enum Vec4BasisSigned
     NW,
 }
 
-Vec4 from_basis(Vec4BasisSigned b)
+Vec4 from_basis(Vec4Basis b) pure
+{
+    final switch (b)
+    {
+        case Vec4Basis.X:
+            return Vec4(1, 0, 0, 0);
+
+        case Vec4Basis.Y:
+            return Vec4(0, 1, 0, 0);
+
+        case Vec4Basis.Z:
+            return Vec4(0, 0, 1, 0);
+
+        case Vec4Basis.W:
+            return Vec4(0, 0, 0, 1);
+    }
+}
+
+Vec4 from_basis(Vec4BasisSigned b) pure
 {
     final switch (b)
     {
@@ -238,6 +257,38 @@ Vec4 normalized()(auto ref in Vec4 a) pure
 {
     immutable float m = a.magnitude();
     return Vec4(a.x / m, a.y / m, a.z / m, a.w / m);
+}
+
+
+Vec4 arbitrary_perp_vec()(auto ref in Vec4 a, auto ref in Vec4 b) pure
+{
+    Vec4[4] vs;
+
+    static foreach (i, e; EnumMembers!Vec4Basis) {
+        vs[i] = cross_p(a, b, from_basis(e));
+    }
+
+    return vs[].maxElement!(a => a.magnitude()).normalized();
+}
+
+
+bool is_coplanar()(auto ref in Vec4[] vs) pure {
+    if (vs.length < 4) {
+        return true;
+    }
+
+    Vec4 a = vs[1] - vs[0];
+    Vec4 b = vs[2] - vs[0];
+    Vec4 c = arbitrary_perp_vec(a, b);
+    Vec4 n = cross_p(a, b, c);
+
+    for (size_t i = 3; i < vs.length; i++) {
+        if (abs(dot_p(vs[i] - vs[0], c)) > 1e5 ||
+            abs(dot_p(vs[i] - vs[0], n)) > 1e5) {
+            return false;
+        }
+    }
+    return true;
 }
 
 float angle_between()(auto ref in Vec4 a, auto ref in Vec4 b, auto ref in Vec4 pa, auto ref in Vec4 pb) pure

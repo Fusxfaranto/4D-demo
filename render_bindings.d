@@ -31,10 +31,10 @@ struct CuboidShaderData {
     float *up;
     float *front;
 
-    int *adjacent_corners;
-
     float *view;
     float *projection;
+
+    int *edge_ordering;
 }
 extern (C) extern __gshared CuboidShaderData cuboid_uniforms;
 extern (C) extern __gshared CuboidShaderData cuboid_uniforms_vertical;

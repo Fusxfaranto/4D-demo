@@ -1,7 +1,7 @@
 
 import std.stdio : write, writeln;
 import std.conv : to;
-import std.math : PI, sin, cos, acos, sgn, sqrt, abs;
+import std.math : PI, sin, cos, acos, sgn, sqrt, abs, atan2;
 import std.range : back, popBack;
 import std.array : array, empty;
 import std.algorithm : sum, map, schwartzSort, sort;
@@ -591,6 +591,101 @@ immutable Vec4[8] reference_cube = [
     ];
 
 
+
+// TODO edge_ordering can be halved in size using unsigned orientation
+void order_edges(ref int[6][8][8] edge_ordering, Vec4 normal, Vec4 front, Vec4 right) {
+    // TODO
+    immutable Vec4 cube_perp = from_basis(Vec4BasisSigned.Y);
+
+    writeln(normal);
+    writeln(front);
+    writeln(right);
+
+    Vec4[8] projected_corners = void;
+    size_t[8] idxs = void;
+    float[8] corner_dists = void;
+
+    foreach (i, v; reference_cube) {
+        idxs[i] = i;
+        projected_corners[i] = proj(v, normal);
+        corner_dists[i] = dot_p(v, normal);
+        assert(abs(dot_p(projected_corners[i], normal) - corner_dists[i]) < 1e-5);
+        writeln(corner_dists[i], '\t', projected_corners[i]);
+    }
+
+    sort!((a, b) => corner_dists[a] < corner_dists[b])(idxs[]);
+
+    for (size_t i = 0; i < 7; i++) {
+        Vec4 midpoint = 0.5 * (projected_corners[idxs[i]] + projected_corners[idxs[i + 1]]);
+
+        Vec4[8] rel_pos = void;
+        bool[8] pos_side = void;
+        for (size_t j = 0; j < 8; j++) {
+            rel_pos[j] = reference_cube[j] - midpoint;
+            pos_side[j] = dot_p(rel_pos[j], normal) > 0;
+        }
+
+        Vec4 centroid = Vec4(0, 0, 0, 0);
+        static size_t[] intersecting_edges;
+        intersecting_edges.unsafe_reset();
+        static Vec4[] intersection_points;
+        intersection_points.unsafe_reset();
+        static size_t[] intersection_point_idxs;
+        intersection_point_idxs.unsafe_reset();
+        foreach (j, t; reference_adjacent_corners) {
+            if (pos_side[t[0]] != pos_side[t[1]]) {
+                intersecting_edges ~= j;
+                intersection_point_idxs ~= intersection_point_idxs.length;
+
+                Vec4 diff = rel_pos[t[0]] - rel_pos[t[1]];
+                float d = dot_p(normal, diff);
+                intersection_points ~= rel_pos[t[0]] + diff * (-dot_p(rel_pos[t[0]], normal) / d);
+
+                centroid += intersection_points[$-1];
+            }
+        }
+        centroid = centroid / intersection_points.length;
+
+        assert(intersecting_edges.length == intersection_points.length);
+        assert(intersecting_edges.length == intersection_point_idxs.length);
+        assert(is_coplanar(intersection_points));
+
+        if (intersecting_edges.length == 0) {
+            continue; // TODO ??? is this ok
+        }
+
+        static float[] intersection_point_angles;
+        intersection_point_angles.unsafe_reset();
+        foreach (p; intersection_points) {
+            float t = dot_p(normal, cross_p(cube_perp, p - centroid, front));
+            float u = dot_p(normal, cross_p(cube_perp, p - centroid, right));
+            intersection_point_angles ~= atan2(u, t);
+        }
+
+        //sort!((a, b) => dot_p(normal, cross_p(cube_perp, intersection_points[a] - centroid, intersection_points[b] - centroid)) < 0)(intersection_point_idxs);
+        sort!((a, b) => intersection_point_angles[a] < intersection_point_angles[b])(intersection_point_idxs);
+
+        write(idxs[i], ": ");
+        for (size_t j = 0; j < 6; j++) {
+            if (j < intersection_points.length) {
+                size_t idx = j % 2 == 0 ? intersection_point_idxs[j / 2] : intersection_point_idxs[intersection_points.length - 1 - (j / 2)];
+                edge_ordering[0][idxs[i]][j] = cast(int)intersecting_edges[idx];
+                write(intersecting_edges[idx], ", ");
+            } else {
+                edge_ordering[0][idxs[i]][j] = -1; // TODO ??
+            }
+        }
+        writeln();
+    }
+
+    for (size_t i = 0; i < 8; i++) {
+        for (size_t j = 0; j < 6; j++) {
+            edge_ordering[i][idxs[7]][j] = -1; // TODO?
+        }
+    }
+}
+
+
 // TODO since this is probably going to need to be per-orientation, would it
 // be better to enumerate the edges and order those?  (rather than pairs of corners)
 void order_adjacent_corners(ref int[2][12] adjacent_corners, Vec4 front, Vec4 right) {
@@ -648,13 +743,15 @@ void order_adjacent_corners(ref int[2][12] adjacent_corners, Vec4 front, Vec4 ri
     //writeln(adjacent_corners);
 }
 
-void order_adjacent_corners_alt(ref int[2][12] adjacent_corners, Vec4 normal) {
+void order_adjacent_corners_alt(ref int[2][12] adjacent_corners, Vec4 normal, Vec4 front, Vec4 right) {
     // TODO
     immutable Vec4 cube_perp = from_basis(Vec4BasisSigned.Y);
 
     bool[12][12] edge_dag = false;
 
     writeln(normal);
+    writeln(front);
+    writeln(right);
 
     Vec4[8] projected_corners = void;
     size_t[8] idxs = void;
@@ -702,12 +799,22 @@ void order_adjacent_corners_alt(ref int[2][12] adjacent_corners, Vec4 normal) {
 
         assert(intersecting_edges.length == intersection_points.length);
         assert(intersecting_edges.length == intersection_point_idxs.length);
+        assert(is_coplanar(intersection_points));
 
         if (intersecting_edges.length == 0) {
             continue; // TODO ??? is this ok
         }
 
-        sort!((a, b) => dot_p(normal, cross_p(cube_perp, intersection_points[a] - centroid, intersection_points[b] - centroid)) < 0)(intersection_point_idxs);
+        static float[] intersection_point_angles;
+        intersection_point_angles.unsafe_reset();
+        foreach (p; intersection_points) {
+            float t = dot_p(normal, cross_p(cube_perp, p - centroid, front));
+            float u = dot_p(normal, cross_p(cube_perp, p - centroid, right));
+            intersection_point_angles ~= atan2(u, t);
+        }
+
+        //sort!((a, b) => dot_p(normal, cross_p(cube_perp, intersection_points[a] - centroid, intersection_points[b] - centroid)) < 0)(intersection_point_idxs);
+        sort!((a, b) => intersection_point_angles[a] < intersection_point_angles[b])(intersection_point_idxs);
 
         for (size_t j = 0; j < intersection_points.length - 1; j++) {
             size_t idx1 = intersection_point_idxs[j];
@@ -745,7 +852,7 @@ void order_adjacent_corners_alt(ref int[2][12] adjacent_corners, Vec4 normal) {
             start_nodes ~= i;
         }
     }
-    assert(start_nodes.length > 0);
+    //assert(start_nodes.length > 0);
 
     static size_t[] edge_ordering;
     edge_ordering.unsafe_reset();
@@ -774,14 +881,19 @@ void order_adjacent_corners_alt(ref int[2][12] adjacent_corners, Vec4 normal) {
 
     print_dag();
 
+    size_t n = 0;
     for (size_t i = 0; i < 12; i++) {
         for (size_t j = 0; j < 12; j++) {
-            assert(!edge_dag[i][j]);
+            if (edge_dag[i][j]) {
+                n++;
+            }
+            //assert(!edge_dag[i][j]);
         }
     }
-    assert(edge_ordering.length == 12);
+    assert(n == 0 || n > 4); // TODO
+    //assert(edge_ordering.length == 12);
 
     for (size_t i = 0; i < 12; i++) {
-        adjacent_corners[i] = reference_adjacent_corners[edge_ordering[i]];
+        //adjacent_corners[i] = reference_adjacent_corners[edge_ordering[i]];
     }
 }
