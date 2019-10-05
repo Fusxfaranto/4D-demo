@@ -472,10 +472,14 @@ void render_cuboids(/*const*/ ChunkGLData **data, const CuboidShaderData* unifor
         //printf("rendering %d\n", i);
         glBindVertexArray(data[i]->VAO);
         glDrawArrays(GL_POINTS, 0, data[i]->len);
+        if (data[i]->len > 0) {
+            //printf("%d\n", data[i]->len);
+        }
     }
 }
 
 
+// TODO i don't think these state changes are in the optimal order
 void render(void)
 {
     glfwSetWindowTitle(w, title);
@@ -560,10 +564,39 @@ void render(void)
 
     {
         glUseProgram(cuboid_shader);
-        glViewport(0, 0, width, height);
-        glBindFramebuffer(GL_FRAMEBUFFER, main_fb);
 
+        switch (display_mode)
+        {
+        case DisplayMode__NORMAL:
+            glViewport(0, 0, width, height);
+            break;
+
+        case DisplayMode__SPLIT:
+            glViewport(0, 0, width / 2, height);
+            break;
+
+        default:
+            assert(0);
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, main_fb);
         render_cuboids(cuboid_data, &cuboid_uniforms);
+
+
+        switch (display_mode)
+        {
+        case DisplayMode__NORMAL:
+            break;
+
+        case DisplayMode__SPLIT:
+            glViewport(0, 0, width / 2, height);
+
+            glBindFramebuffer(GL_FRAMEBUFFER, vertical_fb);
+            render_cuboids(cuboid_data_vertical, &cuboid_uniforms_vertical);
+            break;
+
+        default:
+            assert(0);
+        }
     }
 
 

@@ -48,8 +48,6 @@ string[] scratch_strings;
 //Vec4[2] test_plane = [Vec4(0.5, 0.5, 0.5, 0.5), Vec4(-0.5, -0.5, 0.5, 0.5)];
 //float test_angle = 0;
 
-int[6][8][8] edge_ordering;
-
 bool do_close = false;
 
 
@@ -112,6 +110,9 @@ void main()
 
     compass_projection = compass_projection_mat.data;
 
+    int[6][8][8] edge_ordering;
+    int[6][8][8] edge_ordering_vertical;
+
     handle_errors!init();
     scope(exit) cleanup();
 
@@ -130,7 +131,8 @@ void main()
         debug(prof) sw.reset();
 
         fpss[t % fpss.length] = 1.0e9 / (TickDuration.currSystemTick() - last_time).nsecs();
-        title_str = (sum(fpss[]) / fpss.length).to!string() ~ '\0';
+        float fps = sum(fpss[]) / fpss.length;
+        title_str = fps.to!string() ~ '\0';
         last_time = TickDuration.currSystemTick();
 
         process_input();
@@ -228,18 +230,33 @@ void main()
         compass = compass_.data();
         debug(prof) profile_checkpoint();
 
-        float render_radius = 90;
-        load_chunks(char_pos, cast(int)(render_radius / CHUNK_SIZE) + 1, world.loaded_chunks);
+        float render_radius = 700;
+        //load_chunks(char_pos, cast(int)(render_radius / CHUNK_SIZE) + 1, world.loaded_chunks);
+        load_chunks(char_pos, 5, world.loaded_chunks);
 
-        //scratch_strings ~= to!string(world.loaded_chunks.length);
-        scratch_strings ~= to!string(coords_to_chunkpos(char_pos));
+        scratch_strings ~= to!string(world.loaded_chunks.length);
+        //scratch_strings ~= to!string(coords_to_chunkpos(char_pos));
         debug(prof) profile_checkpoint();
 
         final switch (display_mode.to!DisplayMode)
         {
         case DisplayMode.SPLIT:
         {
-            generate_cross_section(world, vertical_objects, render_radius, cube_culling,
+            order_edges(edge_ordering_vertical, global_up);
+            {
+                // TODO don't do these each frame
+                cuboid_uniforms_vertical.base_pos = char_pos.data();
+                cuboid_uniforms_vertical.normal = global_up.data();
+                cuboid_uniforms_vertical.right = flat_right.data();
+                cuboid_uniforms_vertical.up = flat_normal.data();
+                cuboid_uniforms_vertical.front = flat_front.data();
+
+                cuboid_uniforms_vertical.view = view_mat.data();
+                cuboid_uniforms_vertical.projection = projection_mat.data();
+
+                cuboid_uniforms_vertical.edge_ordering = &edge_ordering_vertical[0][0][0];
+            }
+            generate_cross_section(world, &cuboid_data_vertical[0], vertical_objects, render_radius, cube_culling,
                                    char_pos, flat_normal, flat_front, global_up, flat_right);
             debug(prof) profile_checkpoint();
             goto case DisplayMode.NORMAL;
@@ -248,10 +265,7 @@ void main()
 
         case DisplayMode.NORMAL:
         {
-            //order_adjacent_corners(adjacent_corners, char_front, char_right);
-            //order_adjacent_corners_alt(adjacent_corners, char_normal, char_front, char_right);
-            order_edges(edge_ordering, char_normal, char_front, char_right);
-
+            order_edges(edge_ordering, char_normal);
             {
                 // TODO don't do these each frame
                 cuboid_uniforms.base_pos = char_pos.data();
@@ -267,7 +281,7 @@ void main()
             }
 
             //scratch_strings.length = 0;
-            generate_cross_section(world, objects, render_radius, cube_culling,
+            generate_cross_section(world, &cuboid_data[0], objects, render_radius, cube_culling,
                           char_pos, char_up, char_front, char_normal, char_right);
             debug(prof) profile_checkpoint();
         }
