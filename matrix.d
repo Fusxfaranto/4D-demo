@@ -259,6 +259,11 @@ Vec4 normalized()(auto ref in Vec4 a) pure
     return Vec4(a.x / m, a.y / m, a.z / m, a.w / m);
 }
 
+float distance()(auto ref in Vec4 a, auto ref in Vec4 b) pure {
+    Vec4 d = a - b;
+    return d.magnitude();
+}
+
 
 Vec4 arbitrary_perp_vec()(auto ref in Vec4 a, auto ref in Vec4 b) pure
 {
@@ -272,7 +277,7 @@ Vec4 arbitrary_perp_vec()(auto ref in Vec4 a, auto ref in Vec4 b) pure
 }
 
 
-bool is_coplanar()(auto ref in Vec4[] vs) pure {
+bool is_coplanar(float T = 1e-5)(auto ref in Vec4[] vs) pure {
     if (vs.length < 4) {
         return true;
     }
@@ -283,8 +288,8 @@ bool is_coplanar()(auto ref in Vec4[] vs) pure {
     Vec4 n = cross_p(a, b, c);
 
     for (size_t i = 3; i < vs.length; i++) {
-        if (abs(dot_p(vs[i] - vs[0], c)) > 1e5 ||
-            abs(dot_p(vs[i] - vs[0], n)) > 1e5) {
+        if (abs(dot_p(vs[i] - vs[0], c)) > T ||
+            abs(dot_p(vs[i] - vs[0], n)) > T) {
             return false;
         }
     }

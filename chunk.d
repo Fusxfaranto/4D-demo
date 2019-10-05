@@ -181,7 +181,9 @@ struct Chunk
 
                         void process_cube(Vec4 pos, Vec4BasisSigned dir) {
                             // TODO debug
-                            if (dir != Vec4BasisSigned.Y) return;
+                            //if (dir != Vec4BasisSigned.Y) return;
+                            //writeln(pos);
+                            //assert(pos == Vec4(0, 0, 0, 0));
 
                             *vert_data++ = pos.x;
                             *vert_data++ = pos.y;
@@ -411,6 +413,7 @@ Chunk gen_fixed_chunk()
                     //if ((b - &c.data[0]) % 1755 == 0)
                     if ((b - &c.data[0]) % 37 == 8)
                     //if (w == x && w == y && w == z && w == 0)
+                    //if (x == 0 && y == 0 && z == 0 && w == 0)
                     //if (x < 5 && x % 2 == 0 && w == y && w == z && w == 0)
                     //if ((x != 0) + (y != 0) + (z != 0) + (w != 0) <= 1)
                     {
@@ -431,9 +434,10 @@ Chunk fetch_chunk(ChunkPos loc)
 
     Chunk c;
 
-    if (//true ||
-        loc == ChunkPos(-1, -1, -1, 0) &&
-        loc.y < 0
+    if (true
+        //loc == ChunkPos(-1, -1, -1, 0) &&
+        //loc.y < 0
+        //loc == ChunkPos(0, 0, 0, 0)
         )
     {
         if (!fixed_chunk)
