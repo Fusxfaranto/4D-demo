@@ -1,6 +1,5 @@
 
-import std.stdio : writeln, stdout;
-import std.range : back, popBack;
+import std.range : back;
 import std.array : empty;
 import std.conv : to;
 import std.math : abs, sqrt, floor;
@@ -22,6 +21,11 @@ enum BlockType : ubyte
     NONE,
     TEST,
 }
+
+bool is_transparent(BlockType b) {
+    return b == BlockType.NONE;
+}
+
 
 struct ChunkPos
 {
@@ -54,38 +58,154 @@ struct ChunkPos
 }
 
 
-enum ChunkStatus
+alias ChunkGrid = BlockType[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
+struct ChunkData {
+    union {
+        ChunkGrid grid;
+        BlockType[BLOCKS_IN_CHUNK] data;
+    }
+
+    BlockType* begin()
+    {
+        return &data[0];
+    }
+
+    BlockType* end()
+    {
+        return &data[0] + BLOCKS_IN_CHUNK;
+    }
+}
+
+enum ChunkDataState {
+    INVALID,
+    LOADED,
+    EMPTY,
+    OCCLUDED_UNLOADED,
+//    SPARSE, // TODO?
+}
+
+enum ChunkProcessingStatus
 {
     NOT_PROCESSED,
     PROCESSED,
 }
 
-alias ChunkGrid = BlockType[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
 struct Chunk
 {
     //ChunkPos location;
-    union
-    {
-        ChunkGrid grid;
-        BlockType[BLOCKS_IN_CHUNK] data;
-    }
 
+    ChunkData *data;
     ChunkGLData *gl_data;
-    ChunkStatus status;
 
-    const(BlockType*) begin() const pure
-    {
-        return &data[0];
+    ubyte occludes_side;
+    ubyte occluded_from;
+
+    ChunkDataState state;
+    ChunkProcessingStatus processing_status;
+
+    void update_from_internal() {
+        final switch (state) {
+        case ChunkDataState.INVALID:
+            assert(0);
+
+        case ChunkDataState.EMPTY:
+            return;
+
+        case ChunkDataState.LOADED:
+        case ChunkDataState.OCCLUDED_UNLOADED: // TODO
+            break;
+        }
+
+        assert(data);
+
+        // TODO this is naive and can probably be an order faster
+        occludes_side = 0xff;
+        for (size_t x = 0; x < CHUNK_SIZE; x++) {
+            for (size_t y = 0; y < CHUNK_SIZE; y++) {
+                for (size_t z = 0; z < CHUNK_SIZE; z++) {
+                    for (size_t w = 0; w < CHUNK_SIZE; w++) {
+                        if (x == 0 && is_transparent(data.grid[x][y][z][w])) {
+                            occludes_side &= ~(1 << 0);
+                        }
+                        if (y == 0 && is_transparent(data.grid[x][y][z][w])) {
+                            occludes_side &= ~(1 << 1);
+                        }
+                        if (z == 0 && is_transparent(data.grid[x][y][z][w])) {
+                            occludes_side &= ~(1 << 2);
+                        }
+                        if (w == 0 && is_transparent(data.grid[x][y][z][w])) {
+                            occludes_side &= ~(1 << 3);
+                        }
+                        if (x == CHUNK_SIZE - 1 && is_transparent(data.grid[x][y][z][w])) {
+                            occludes_side &= ~(1 << 4);
+                        }
+                        if (y == CHUNK_SIZE - 1 && is_transparent(data.grid[x][y][z][w])) {
+                            occludes_side &= ~(1 << 5);
+                        }
+                        if (z == CHUNK_SIZE - 1 && is_transparent(data.grid[x][y][z][w])) {
+                            occludes_side &= ~(1 << 6);
+                        }
+                        if (w == CHUNK_SIZE - 1 && is_transparent(data.grid[x][y][z][w])) {
+                            occludes_side &= ~(1 << 7);
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    const(BlockType*) end() const pure
-    {
-        return &data[0] + BLOCKS_IN_CHUNK;
+    void update_from_surroundings(ChunkPos loc, const ref Chunk[ChunkPos] chunks) {
+        final switch (state) {
+        case ChunkDataState.INVALID:
+            assert(0);
+
+        case ChunkDataState.LOADED:
+        case ChunkDataState.OCCLUDED_UNLOADED:
+            break;
+
+        case ChunkDataState.EMPTY:
+            return;
+        }
+
+        occluded_from = 0;
+        for (int i = 0; i < 8; i++)
+        {
+            ChunkPos adjacent_loc = void;
+            final switch (i) {
+            case 0: adjacent_loc = loc.shift!"x"(1); break;
+            case 1: adjacent_loc = loc.shift!"y"(1); break;
+            case 2: adjacent_loc = loc.shift!"z"(1); break;
+            case 3: adjacent_loc = loc.shift!"w"(1); break;
+            case 4: adjacent_loc = loc.shift!"x"(-1); break;
+            case 5: adjacent_loc = loc.shift!"y"(-1); break;
+            case 6: adjacent_loc = loc.shift!"z"(-1); break;
+            case 7: adjacent_loc = loc.shift!"w"(-1); break;
+            }
+
+            const Chunk* p = adjacent_loc in chunks;
+            int relative_side = (i + 4) & 0b111;
+            if (p is null || p.occludes_side & (1 << relative_side)) {
+                occluded_from |= 1 << i;
+            }
+        }
+
+        if (occluded_from == 0xff) {
+            // TODO actually unload data?
+            state = ChunkDataState.OCCLUDED_UNLOADED;
+        }
+
+        update_gl_data(loc);
     }
 
-    void update_gl_data(ChunkPos loc) {
+    private void update_gl_data(ChunkPos loc) {
         // TODO implement actually updating more than once
-        assert(gl_data is null);
+        //assert(gl_data is null);
+        if (gl_data !is null) {
+            writeln("NOT RELOADING GL DATA ", loc);
+            return;
+        }
+
+        assert(data);
 
         // TODO double check that this is actually the right type lol
         float* vert_data = cast(float*)(gen_chunk_gl_data(&gl_data));
@@ -94,7 +214,7 @@ struct Chunk
         scope(exit) finish_chunk_gl_data(gl_data, (vert_data - vert_data_init) / 8);
 
         // TODO uhh not this
-        const(BlockType)* b = begin();
+        const(BlockType)* b = data.begin();
         for (size_t x = 0; x < CHUNK_SIZE; x++)
         {
             for (size_t y = 0; y < CHUNK_SIZE; y++)
@@ -111,11 +231,6 @@ struct Chunk
                         Vec4 block_pos = Vec4(x, y, z, w) + loc.to_vec4();
 
                         void process_cube(Vec4 pos, Vec4BasisSigned dir) {
-                            // TODO debug
-                            //if (dir != Vec4BasisSigned.Y) return;
-                            //writeln(pos);
-                            //assert(pos == Vec4(0, 0, 0, 0));
-
                             *vert_data++ = pos.x;
                             *vert_data++ = pos.y;
                             *vert_data++ = pos.z;
@@ -241,7 +356,9 @@ int chunkpos_l1_dist(ChunkPos a, ChunkPos b)
 Chunk gen_fixed_chunk()
 {
     Chunk c;
-    BlockType* b = &c.data[0];
+    c.data = new ChunkData;
+    c.state = ChunkDataState.LOADED;
+    BlockType* b = c.data.begin();
     foreach (x; 0..CHUNK_SIZE)
     {
         foreach (y; 0..CHUNK_SIZE)
@@ -259,7 +376,8 @@ Chunk gen_fixed_chunk()
                     //if (w == x && w == y && w == z && w == 0)
                     //if (x == 0 && y == 0 && z == 0 && w == 0)
                     //if (x < 5 && x % 2 == 0 && w == y && w == z && w == 0)
-                    if ((x != 0) + (y != 0) + (z != 0) + (w != 0) <= 1)
+                    //if ((x != 0) + (y != 0) + (z != 0) + (w != 0) <= 1)
+                    if (true)
                     {
                         *b = BlockType.TEST;
                     }
@@ -278,9 +396,9 @@ Chunk fetch_chunk(ChunkPos loc)
     Chunk c;
 
     if (
-        true
-        //loc == ChunkPos(-1, -1, -1, 0) &&
-        //loc.y < 0
+        //true
+        //loc == ChunkPos(-1, -1, -1, 0)
+        loc.y < 0
         //loc == ChunkPos(0, 0, 0, 0)
         //loc == ChunkPos(1, 0, 1, 0)
         )
@@ -292,20 +410,23 @@ Chunk fetch_chunk(ChunkPos loc)
         }
 
         c = *fixed_chunk;
+    } else {
+        c.state = ChunkDataState.EMPTY;
     }
 
-    c.update_gl_data(loc);
+    //c.update_gl_data(loc);
+
+    c.update_from_internal();
 
     return c;
 }
 
 
-
+// TODO this need some general rethinking
 void load_chunks(Vec4 center, int l1_radius, ref Chunk[ChunkPos] loaded_chunks)
 {
     static ChunkPos[] load_stack;
-    load_stack.length = 0;
-    load_stack.assumeSafeAppend();
+    load_stack.unsafe_reset();
 
     //GC.disable();
     //scope(exit) GC.enable();
@@ -339,16 +460,21 @@ void load_chunks(Vec4 center, int l1_radius, ref Chunk[ChunkPos] loaded_chunks)
         load_stack ~= center_cp;
     }
 
+
+    static ChunkPos[] newly_loaded;
+    newly_loaded.unsafe_reset();
+
     while (!load_stack.empty())
     {
         ChunkPos cp = load_stack.back();
-        load_stack.popBack();
+        load_stack.unsafe_popback();
 
         if (cp in loaded_chunks)
         {
             continue;
         }
 
+        newly_loaded ~= cp;
         loaded_chunks[cp] = fetch_chunk(cp);
         writeln("loaded ", cp);
         debug(prof) profile_checkpoint();
@@ -370,6 +496,32 @@ void load_chunks(Vec4 center, int l1_radius, ref Chunk[ChunkPos] loaded_chunks)
             if (chunkpos_l1_dist(center_cp, new_cp) <= l1_radius && new_cp !in loaded_chunks)
             {
                 load_stack ~= new_cp;
+            }
+        }
+    }
+
+    // TODO i think this basically works but it overprocesses
+    // should reuse processing_status?
+    foreach (ref cp; newly_loaded) {
+        loaded_chunks[cp].update_from_surroundings(cp, loaded_chunks);
+
+        for (int i = 0; i < 8; i++)
+        {
+            ChunkPos adjacent_cp = void;
+            final switch (i) {
+            case 0: adjacent_cp = cp.shift!"x"(1); break;
+            case 1: adjacent_cp = cp.shift!"y"(1); break;
+            case 2: adjacent_cp = cp.shift!"z"(1); break;
+            case 3: adjacent_cp = cp.shift!"w"(1); break;
+            case 4: adjacent_cp = cp.shift!"x"(-1); break;
+            case 5: adjacent_cp = cp.shift!"y"(-1); break;
+            case 6: adjacent_cp = cp.shift!"z"(-1); break;
+            case 7: adjacent_cp = cp.shift!"w"(-1); break;
+            }
+
+            Chunk* p = adjacent_cp in loaded_chunks;
+            if (p) {
+                p.update_from_surroundings(adjacent_cp, loaded_chunks);
             }
         }
     }

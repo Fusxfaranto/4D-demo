@@ -1,5 +1,6 @@
 
-import std.stdio : writeln, stdout;
+public import std.stdio : write, writeln, writef, writefln;
+
 import std.traits : OriginalType;
 import std.datetime.stopwatch : StopWatch;
 import std.datetime : to, TickDuration;

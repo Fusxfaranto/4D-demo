@@ -232,10 +232,10 @@ void main()
 
         float render_radius = 700;
         //load_chunks(char_pos, cast(int)(render_radius / CHUNK_SIZE) + 1, world.loaded_chunks);
-        load_chunks(char_pos, 5, world.loaded_chunks);
+        load_chunks(char_pos, 3, world.loaded_chunks);
 
-        scratch_strings ~= to!string(world.loaded_chunks.length);
-        //scratch_strings ~= to!string(coords_to_chunkpos(char_pos));
+        //scratch_strings ~= to!string(world.loaded_chunks.length);
+        scratch_strings ~= to!string(coords_to_chunkpos(char_pos));
         debug(prof) profile_checkpoint();
 
         final switch (display_mode.to!DisplayMode)

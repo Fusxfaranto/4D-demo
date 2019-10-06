@@ -61,16 +61,22 @@ void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[
         //writeln("processing ", cp);
         //scratch_strings ~= cp.to!string();
         processed_cps ~= cp;
-        c.status = ChunkStatus.PROCESSED;
+        c.processing_status = ChunkProcessingStatus.PROCESSED;
 
-        if (false) {
-            //process_hdtree(c.tree, IndexVec4.init, c, cp);
-        } else {
-            // if (skip_render!HDTREE_N(cp.to_vec4())) {
-            //     return;
-            // }
+        assert(c.state != ChunkDataState.INVALID);
 
+        final switch (c.state) {
+        case ChunkDataState.INVALID:
+            assert(0);
+
+        case ChunkDataState.LOADED:
+            assert(c.gl_data);
             *gl_data_p++ = c.gl_data;
+            break;
+
+        case ChunkDataState.EMPTY:
+        case ChunkDataState.OCCLUDED_UNLOADED:
+            break;
         }
     }
 
@@ -115,7 +121,7 @@ void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[
 
             //writeln(cs_stack.length, ' ', cs_stack.capacity);
             Chunk* p = new_cp in world.loaded_chunks;
-            if (p && p.status == ChunkStatus.NOT_PROCESSED)
+            if (p && p.processing_status == ChunkProcessingStatus.NOT_PROCESSED)
             {
                 cs_stack ~= new_cp;
                 //debug(prof) sw.stop();
@@ -130,7 +136,7 @@ void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[
     //writeln(processed_cps);
     foreach (cp; processed_cps)
     {
-        world.loaded_chunks[cp].status = ChunkStatus.NOT_PROCESSED;
+        world.loaded_chunks[cp].processing_status = ChunkProcessingStatus.NOT_PROCESSED;
     }
     processed_cps.unsafe_reset();
 
