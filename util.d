@@ -1,10 +1,13 @@
 
 public import std.stdio : write, writeln, writef, writefln;
 
-import std.traits : OriginalType;
+import std.traits : OriginalType, isIntegral;
 import std.datetime.stopwatch : StopWatch;
 import std.datetime : to, TickDuration;
 import std.conv : to;
+
+
+enum float LARGE_FLOAT = 1e20;
 
 
 void handle_errors(alias F, Args...)(Args a) if (is(typeof(F(a)) : int))
@@ -16,6 +19,14 @@ void handle_errors(alias F, Args...)(Args a) if (is(typeof(F(a)) : int))
     }
 }
 
+
+// http://www.microhowto.info/howto/round_towards_minus_infinity_when_dividing_integers_in_c_or_c++.html
+T div_floor(T)(T x, T y) if (isIntegral!T) {
+    int q = x / y;
+    int r = x % y;
+    if ((r != 0) && ((r < 0) != (y < 0))) q--;
+    return q;
+}
 
 
 

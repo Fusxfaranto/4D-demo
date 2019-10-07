@@ -2,6 +2,7 @@
 import std.range : back;
 import std.array : empty;
 import std.conv : to;
+import std.functional : unaryFun;
 import std.math : abs, sqrt, floor;
 import std.traits : EnumMembers;
 import core.memory : GC;
@@ -27,35 +28,89 @@ bool is_transparent(BlockType b) {
 }
 
 
-struct ChunkPos
+struct IPos(size_t N)
 {
     int x;
     int y;
     int z;
     int w;
 
-    ChunkPos shift(string d)(int val) pure const
+    enum INVALID = IPos!N(int.max, int.max, int.max, int.max);
+
+    this(int x_, int y_, int z_, int w_) {
+        x = x_;
+        y = y_;
+        z = z_;
+        w = w_;
+    }
+
+    this(Vec4 v) {
+        x = to!int(floor(v.x / N));
+        y = to!int(floor(v.y / N));
+        z = to!int(floor(v.z / N));
+        w = to!int(floor(v.w / N));
+    }
+
+    IPos!N shift(string d)(int val) pure const
     {
-        ChunkPos c = this.dup();
+        IPos!N c = this.dup();
         mixin("c." ~ d) += val;
         return c;
     }
 
     Vec4 to_vec4() pure const
     {
-        return Vec4(x, y, z, w) * CHUNK_SIZE;
+        return Vec4(x, y, z, w) * N;
     }
 
     Vec4 to_vec4_centered() pure const
     {
-        return Vec4(x + 0.5, y + 0.5, z + 0.5, w + 0.5) * CHUNK_SIZE;
+        return Vec4(x + 0.5, y + 0.5, z + 0.5, w + 0.5) * N;
     }
 
-    ChunkPos dup() pure const
+    IPos!N dup() pure const
     {
-        return ChunkPos(x, y, z, w);
+        return IPos!N(x, y, z, w);
     }
+
+    bool all(alias Fp)() pure const {
+        alias F = unaryFun!Fp;
+        return F(x) && F(y) && F(z) && F(w);
+    }
+
+    // TODO is this correct? (at boundaries)
+    auto divide(int F)() pure const {
+        return IPos!(N * F)(
+            div_floor(x, F),
+            div_floor(y, F),
+            div_floor(z, F),
+            div_floor(w, F),
+            );
+    }
+
+    auto opBinary(string op, T)(auto ref in T b) const if ((op == "-" || op == "+"))
+    {
+        static if (is(T : IPos!Np, size_t Np)) {
+            static assert(N <= Np); // TODO
+            enum int F = Np / N;
+            static assert(F * N == Np);
+            return mixin("IPos!N(x" ~ op ~ "(b.x * F), y" ~ op ~ "(b.y * F), z" ~ op ~ "(b.z * F), w" ~ op ~ "(b.w * F))");
+        } else {
+            static assert(0);
+        }
+    }
+
+    // IPos!N opBinaryRight(string op)(int a) const if (op == "*" || op == "/")
+    // {
+    //     return mixin("IPos!N(a " ~ op ~ " x, a " ~ op ~ " y, a " ~ op ~ " z, a " ~ op ~ " w)");
+    // }
 }
+
+float distance(T)(auto ref in T a, auto ref in T b) if (is(T : IPos!Np, size_t Np)) {
+    return sqrt(to!real((a.x - b.x) ^^ 2 + (a.y - b.y) ^^ 2 + (a.z - b.z) ^^ 2 + (a.w - b.w) ^^ 2));
+}
+
+alias ChunkPos = IPos!CHUNK_SIZE;
 
 
 alias ChunkGrid = BlockType[CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE][CHUNK_SIZE];
@@ -322,16 +377,6 @@ struct Chunk
 
 
 
-ChunkPos coords_to_chunkpos(Vec4 v)
-{
-    return ChunkPos(
-        to!int(floor(v.x / CHUNK_SIZE)),
-        to!int(floor(v.y / CHUNK_SIZE)),
-        to!int(floor(v.z / CHUNK_SIZE)),
-        to!int(floor(v.w / CHUNK_SIZE)),
-        );
-}
-
 // Vec4 chunk_idx_to_vec4(size_t idx)
 // {
 //     return Vec4(
@@ -371,13 +416,15 @@ Chunk gen_fixed_chunk()
                     //if (w == x && w == y && w == z)
                     //if (x < 8 && y < 8 && z < 8 && w < 8)
                     //if (x < n && y < n && z < n && w < n)
-                    //if ((b - &c.data[0]) % 1755 == 0)
-                    //if ((b - &c.data[0]) % 37 == 8)
+                    //if ((b - c.data.begin()) % 1755 == 0)
+                    //if ((b - c.data.begin()) % 255 == 0)
+                    //if ((b - c.data.begin()) % 49 == 0)
+                    //if ((b - c.data.begin()) % 37 == 8)
                     //if (w == x && w == y && w == z && w == 0)
                     //if (x == 0 && y == 0 && z == 0 && w == 0)
                     //if (x < 5 && x % 2 == 0 && w == y && w == z && w == 0)
                     //if ((x != 0) + (y != 0) + (z != 0) + (w != 0) <= 1)
-                    if (true)
+                    if (y == CHUNK_SIZE - 1)
                     {
                         *b = BlockType.TEST;
                     }
@@ -398,7 +445,8 @@ Chunk fetch_chunk(ChunkPos loc)
     if (
         //true
         //loc == ChunkPos(-1, -1, -1, 0)
-        loc.y < 0
+        //loc.y < 0
+        loc.y == -1
         //loc == ChunkPos(0, 0, 0, 0)
         //loc == ChunkPos(1, 0, 1, 0)
         )
@@ -423,7 +471,7 @@ Chunk fetch_chunk(ChunkPos loc)
 
 
 // TODO this need some general rethinking
-void load_chunks(Vec4 center, int l1_radius, ref Chunk[ChunkPos] loaded_chunks)
+void load_chunks(Vec4 center, int radius, ref Chunk[ChunkPos] loaded_chunks)
 {
     static ChunkPos[] load_stack;
     load_stack.unsafe_reset();
@@ -431,7 +479,7 @@ void load_chunks(Vec4 center, int l1_radius, ref Chunk[ChunkPos] loaded_chunks)
     //GC.disable();
     //scope(exit) GC.enable();
 
-    ChunkPos center_cp = coords_to_chunkpos(center);
+    ChunkPos center_cp = ChunkPos(center);
     //if (center_cp in loaded_chunks)
     if (true)
     {
@@ -439,14 +487,14 @@ void load_chunks(Vec4 center, int l1_radius, ref Chunk[ChunkPos] loaded_chunks)
         {
             ChunkPos start_cp = void;
             final switch (i) {
-            case 0: start_cp = center_cp.shift!"x"(1); break;
-            case 1: start_cp = center_cp.shift!"y"(1); break;
-            case 2: start_cp = center_cp.shift!"z"(1); break;
-            case 3: start_cp = center_cp.shift!"w"(1); break;
-            case 4: start_cp = center_cp.shift!"x"(-1); break;
-            case 5: start_cp = center_cp.shift!"y"(-1); break;
-            case 6: start_cp = center_cp.shift!"z"(-1); break;
-            case 7: start_cp = center_cp.shift!"w"(-1); break;
+            case 0: start_cp = center_cp.shift!"x"(radius); break;
+            case 1: start_cp = center_cp.shift!"y"(radius); break;
+            case 2: start_cp = center_cp.shift!"z"(radius); break;
+            case 3: start_cp = center_cp.shift!"w"(radius); break;
+            case 4: start_cp = center_cp.shift!"x"(-radius); break;
+            case 5: start_cp = center_cp.shift!"y"(-radius); break;
+            case 6: start_cp = center_cp.shift!"z"(-radius); break;
+            case 7: start_cp = center_cp.shift!"w"(-radius); break;
             }
             if (start_cp !in loaded_chunks)
             {
@@ -493,7 +541,7 @@ void load_chunks(Vec4 center, int l1_radius, ref Chunk[ChunkPos] loaded_chunks)
             case 7: new_cp = cp.shift!"w"(-1); break;
             }
             //writeln("try to queue ", new_cp);
-            if (chunkpos_l1_dist(center_cp, new_cp) <= l1_radius && new_cp !in loaded_chunks)
+            if (distance(center_cp, new_cp) <= radius && new_cp !in loaded_chunks)
             {
                 load_stack ~= new_cp;
             }

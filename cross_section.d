@@ -31,7 +31,7 @@ void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[
 
     assert(processed_cps.length == 0);
 
-    ChunkPos center_cp = coords_to_chunkpos(base_pos);
+    ChunkPos center_cp = ChunkPos(base_pos);
     cs_stack.unsafe_reset();
     cs_stack ~= center_cp;
 

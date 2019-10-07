@@ -23,8 +23,12 @@ CFLAGS := -m64 -g -c -O3 -std=c11 -pedantic -Wall -Werror -Wno-error=unused-vari
 DFLAGS := -m64 -g -c -O -profile=gc -debug=prof
 #DFLAGS := -vgc
 #LDFLAGS := -Llib -lm -lSOIL -lGLEW -lglfw -lGL
-LDFLAGS := -L-Llib -L-lm -L-lSOIL -L-lGLEW -L-lglfw -L-lGL
-
+LDFLAGS := -L-Llib
+LDFLAGS += -L-lm
+LDFLAGS += -L-lSOIL
+LDFLAGS += -L-lGLEW
+LDFLAGS += -L-lglfw
+LDFLAGS += -L-lGL
 
 .PHONY: all clean distclean
 

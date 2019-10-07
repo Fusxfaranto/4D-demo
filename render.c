@@ -379,8 +379,6 @@ int window_size_update(void)
 void render_objects(FloatDArray os, GLuint VAO, GLuint VBO)
 {
     assert(os.l % 6 == 0);
-    
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glUniformMatrix4fv(view_loc, 1, GL_FALSE, view);
 
@@ -521,46 +519,7 @@ void render(void)
     glEnableVertexAttribArray(0);
     glDrawArrays(GL_LINES, 0, 2);
 
-
-    switch (display_mode)
-    {
-    case DisplayMode__NORMAL:
-        glViewport(0, 0, width, height);
-        break;
-
-    case DisplayMode__SPLIT:
-        glViewport(0, 0, width / 2, height);
-        break;
-
-    default:
-        assert(0);
-    }
-
-    glUseProgram(base_shader);
     glEnable(GL_DEPTH_TEST);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, main_fb);
-    glClearColor(150.0 / 255.0, 127.0 / 255.0, 96.0 / 255.0, 1.0);
-
-    render_objects(objects, main_VAO, main_VBO);
-
-    switch (display_mode)
-    {
-    case DisplayMode__NORMAL:
-        break;
-
-    case DisplayMode__SPLIT:
-        glViewport(0, 0, width / 2, height);
-
-        glBindFramebuffer(GL_FRAMEBUFFER, vertical_fb);
-        glClearColor(1, 1, 0, 1);
-        
-        render_objects(vertical_objects, vertical_VAO, vertical_VBO);
-        break;
-
-    default:
-        assert(0);
-    }
 
     {
         glUseProgram(cuboid_shader);
@@ -579,6 +538,8 @@ void render(void)
             assert(0);
         }
         glBindFramebuffer(GL_FRAMEBUFFER, main_fb);
+        glClearColor(150.0 / 255.0, 127.0 / 255.0, 96.0 / 255.0, 1.0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         render_cuboids(cuboid_data, &cuboid_uniforms);
 
 
@@ -591,7 +552,46 @@ void render(void)
             glViewport(0, 0, width / 2, height);
 
             glBindFramebuffer(GL_FRAMEBUFFER, vertical_fb);
+            glClearColor(1, 1, 0, 1);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             render_cuboids(cuboid_data_vertical, &cuboid_uniforms_vertical);
+            break;
+
+        default:
+            assert(0);
+        }
+    }
+
+    {
+        glUseProgram(base_shader);
+
+        switch (display_mode)
+        {
+        case DisplayMode__NORMAL:
+            glViewport(0, 0, width, height);
+            break;
+
+        case DisplayMode__SPLIT:
+            glViewport(0, 0, width / 2, height);
+            break;
+
+        default:
+            assert(0);
+        }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, main_fb);
+        render_objects(objects, main_VAO, main_VBO);
+
+        switch (display_mode)
+        {
+        case DisplayMode__NORMAL:
+            break;
+
+        case DisplayMode__SPLIT:
+            glViewport(0, 0, width / 2, height);
+
+            glBindFramebuffer(GL_FRAMEBUFFER, vertical_fb);
+            render_objects(vertical_objects, vertical_VAO, vertical_VBO);
             break;
 
         default:

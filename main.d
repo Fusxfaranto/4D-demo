@@ -30,7 +30,7 @@ enum Vec4 global_up = Vec4(0, 1, 0, 0);
 
 Mat4 view_mat, projection_mat, compass_projection_mat;
 
-bool char_enabled = true;
+bool char_enabled = false;
 bool force_window_size_update = false;
 bool cube_culling = true;
 
@@ -93,7 +93,7 @@ void main()
 
     world.scene.length = 0;
     //world.scene ~= tesseract!(false, solid_color_gen!(0.5, 0.5, 0.5))(Vec4(-30, -30, -30, -30), Vec4(60, 60, 60, 60));
-    world.scene ~= tesseract!(false, solid_color_gen!(0.5, 0.5, 0.5))(Vec4(-500, -500, -500, -500), Vec4(1000, 1000, 1000, 1000));
+    //world.scene ~= tesseract!(false, solid_color_gen!(0.5, 0.5, 0.5))(Vec4(-500, -500, -500, -500), Vec4(1000, 1000, 1000, 1000));
     //world.scene ~= tesseract!(false, solid_color_gen!(0.6, 0.5, 0.1))(Vec4(-10, -2, -10, -10), Vec4(20, 2, 20, 20));
     //world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, 5, 0), Vec4(1, 3, 1, 1));
     //world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, -5, 0), Vec4(1, 3, 1, 1));
@@ -104,7 +104,8 @@ void main()
 
     //world.scene ~= tesseract(Vec4(1, 1, 1, 0));
 
-    view_mat = look_at(Vec3(0, 0, 3), Vec3(0, 0, 0), Vec3(0, 1, 0));
+    //view_mat = look_at(camera_pos, Vec3(0, 0, 0), Vec3(0, 1, 0));
+    view_mat = Mat4.init;
     view = view_mat.data;
     projection = projection_mat.data;
 
@@ -117,6 +118,8 @@ void main()
     scope(exit) cleanup();
 
     glfwSetKeyCallback(w, &key_callback);
+
+    BlockPos targeted_block = BlockPos.INVALID;
 
     int t = 0;
     int last_width = -1, last_height = -1;
@@ -174,10 +177,10 @@ void main()
         screen_text_data[0].a.unsafe_reset();
         screen_text_data[0].a ~= title_str.ptr;
 
-        screen_text_data[1].x = -0.6;
+        screen_text_data[1].x = -0.7;
         screen_text_data[1].y = 1;
-        screen_text_data[1].x_scale = 0.001;
-        screen_text_data[1].y_scale = 0.001;
+        screen_text_data[1].x_scale = 0.0008;
+        screen_text_data[1].y_scale = 0.0008;
         screen_text_data[1].line_spacing = 0.1;
         final switch (text_display)
         {
@@ -191,16 +194,16 @@ void main()
 
         case TextDisplay.POS:
             screen_text_data[1].a = [
-                format("front:    %6.3f, %6.3f, %6.3f, %6.3f\0",
-                       char_front.x, char_front.y, char_front.z, char_front.w).ptr,
-                format("up:       %6.3f, %6.3f, %6.3f, %6.3f\0",
-                       char_up.x, char_up.y, char_up.z, char_up.w).ptr,
-                format("right:    %6.3f, %6.3f, %6.3f, %6.3f\0",
-                       char_right.x, char_right.y, char_right.z, char_right.w).ptr,
-                format("normal:   %6.3f, %6.3f, %6.3f, %6.3f\0",
-                       char_normal.x, char_normal.y, char_normal.z, char_normal.w).ptr,
-                format("position: %6.3f, %6.3f, %6.3f, %6.3f\0",
-                       char_pos.x, char_pos.y, char_pos.z, char_pos.w).ptr,
+                format("front:    %6.3f, %6.3f, %6.3f, %6.3f (%6.3f)\0",
+                       char_front.x, char_front.y, char_front.z, char_front.w, char_front.magnitude()).ptr,
+                format("up:       %6.3f, %6.3f, %6.3f, %6.3f (%6.3f)\0",
+                       char_up.x, char_up.y, char_up.z, char_up.w, char_up.magnitude()).ptr,
+                format("right:    %6.3f, %6.3f, %6.3f, %6.3f (%6.3f)\0",
+                       char_right.x, char_right.y, char_right.z, char_right.w, char_right.magnitude()).ptr,
+                format("normal:   %6.3f, %6.3f, %6.3f, %6.3f (%6.3f)\0",
+                       char_normal.x, char_normal.y, char_normal.z, char_normal.w, char_normal.magnitude()).ptr,
+                format("position: %6.3f, %6.3f, %6.3f, %6.3f (%6.3f)\0",
+                       char_pos.x, char_pos.y, char_pos.z, char_pos.w, char_pos.magnitude()).ptr,
                 ];
             break;
         }
@@ -232,10 +235,21 @@ void main()
 
         float render_radius = 700;
         //load_chunks(char_pos, cast(int)(render_radius / CHUNK_SIZE) + 1, world.loaded_chunks);
-        load_chunks(char_pos, 3, world.loaded_chunks);
+        load_chunks(char_pos, 4, world.loaded_chunks);
 
-        //scratch_strings ~= to!string(world.loaded_chunks.length);
-        scratch_strings ~= to!string(coords_to_chunkpos(char_pos));
+        scratch_strings ~= to!string(world.loaded_chunks.length);
+        //scratch_strings ~= to!string(coords_to_chunkpos(char_pos));
+        {
+            // TODO i don't really get why char_front is "backwards" like this
+            targeted_block = world.target_nonempty(char_pos, -1 * char_front);
+            //BlockPos b = world.target_nonempty(Vec4(1, 2, 3, 4), Vec4(0, -1, 0, 0));
+            if (targeted_block != BlockPos.INVALID) {
+                //scratch_strings ~= to!string(b);
+                world.scene = tesseract(targeted_block.to_vec4(), 1.001 * Vec4(1, 1, 1, 1));
+            } else {
+                //scratch_strings ~= "none";
+            }
+        }
         debug(prof) profile_checkpoint();
 
         final switch (display_mode.to!DisplayMode)
