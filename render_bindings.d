@@ -7,8 +7,13 @@ struct ChunkGLData;
 extern (C) void glfwPollEvents();
 extern (C) int glfwWindowShouldClose(GLFWwindow* window);
 extern (C) int glfwGetKey(GLFWwindow* window, int key);
+extern (C) int glfwGetMouseButton(GLFWwindow* window, int button);
 alias GLFWkeyfun = extern (C) void function(GLFWwindow* window, int key, int scancode, int action, int mods);
 extern (C) GLFWkeyfun glfwSetKeyCallback(GLFWwindow* window, GLFWkeyfun cbfun);
+alias GLFWmousebuttonfun = extern (C) void function(GLFWwindow* window, int button, int action, int mods);
+extern (C) GLFWkeyfun glfwSetMouseButtonCallback(GLFWwindow* window, GLFWmousebuttonfun cbfun);
+extern (C) void glfwGetCursorPos(GLFWwindow* window, double* xpos, double* ypos);
+extern (C) void glfwSetCursorPos(GLFWwindow* window, double xpos, double ypos);
 
 extern (C) int glGetError();
 
@@ -23,6 +28,7 @@ extern (C) extern __gshared ChunkGLData*[MAX_RENDERED_CHUNKS + 1] cuboid_data;
 extern (C) extern __gshared ChunkGLData*[MAX_RENDERED_CHUNKS + 1] cuboid_data_vertical;
 extern (C) void* gen_chunk_gl_data(ChunkGLData**);
 extern (C) void finish_chunk_gl_data(ChunkGLData*, size_t);
+extern (C) void free_chunk_gl_data(ChunkGLData*);
 
 struct CuboidShaderData {
     float *base_pos;
@@ -41,7 +47,7 @@ extern (C) extern __gshared CuboidShaderData cuboid_uniforms_vertical;
 
 enum MAX_TEXTS = 16;
 
-extern (C) extern __gshared GLFWwindow* w;
+extern (C) extern __gshared GLFWwindow* window;
 extern (C) extern __gshared int width;
 extern (C) extern __gshared int height;
 extern (C) extern __gshared immutable(char)* title;
@@ -83,6 +89,17 @@ enum GLError
     GL_OUT_OF_MEMORY = 0x0505,
     GL_INVALID_FRAMEBUFFER_OPERATION = 0x0506,
 }
+
+
+enum GLFWMod {
+    GLFW_MOD_SHIFT = 0x0001,
+    GLFW_MOD_CONTROL = 0x0002,
+    GLFW_MOD_ALT = 0x0004,
+    GLFW_MOD_SUPER = 0x0008,
+    GLFW_MOD_CAPS_LOCK = 0x0010,
+    GLFW_MOD_NUM_LOCK = 0x0020,
+}
+
 
 enum GLFWKey
 {
@@ -217,11 +234,29 @@ enum GLFWKeyStatus
 }
 
 
+enum GLFWMouseButton {
+    GLFW_MOUSE_BUTTON_LEFT = 0,
+    GLFW_MOUSE_BUTTON_RIGHT = 1,
+    GLFW_MOUSE_BUTTON_MIDDLE = 2,
+}
+
+
+enum GLFWMouseStatus {
+    GLFW_RELEASE = 0,
+    GLFW_PRESS = 1,
+    GLFW_REPEAT = 2,
+}
+
+
 import std.conv : to;
 
 
 GLFWKeyStatus get_key(GLFWKey k)
 {
-    return glfwGetKey(w, k).to!GLFWKeyStatus;
+    return glfwGetKey(window, k).to!GLFWKeyStatus;
 }
 
+GLFWMouseStatus get_mouse_button(GLFWMouseButton b)
+{
+    return glfwGetMouseButton(window, b).to!GLFWMouseStatus;
+}

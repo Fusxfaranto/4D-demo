@@ -110,6 +110,13 @@ float distance(T)(auto ref in T a, auto ref in T b) if (is(T : IPos!Np, size_t N
     return sqrt(to!real((a.x - b.x) ^^ 2 + (a.y - b.y) ^^ 2 + (a.z - b.z) ^^ 2 + (a.w - b.w) ^^ 2));
 }
 
+
+
+// TODO something better
+T to_ipos(T : IPos!N, size_t N)(Vec4BasisSigned b) pure {
+    return T(b.to_vec4());
+}
+
 alias ChunkPos = IPos!CHUNK_SIZE;
 
 
@@ -157,6 +164,22 @@ struct Chunk
 
     ChunkDataState state;
     ChunkProcessingStatus processing_status;
+
+    void allocate_data() {
+        final switch (state) {
+        case ChunkDataState.INVALID:
+        case ChunkDataState.LOADED:
+        case ChunkDataState.OCCLUDED_UNLOADED: // TODO
+            assert(0);
+
+        case ChunkDataState.EMPTY:
+            break;
+        }
+
+        // TODO sparse
+        data = new ChunkData;
+        state = ChunkDataState.LOADED;
+    }
 
     void update_from_internal() {
         final switch (state) {
@@ -256,8 +279,8 @@ struct Chunk
         // TODO implement actually updating more than once
         //assert(gl_data is null);
         if (gl_data !is null) {
-            writeln("NOT RELOADING GL DATA ", loc);
-            return;
+            writeln("CASUALLY THROWING AWAY GL DATA ", loc);
+            free_chunk_gl_data(gl_data);
         }
 
         assert(data);
@@ -424,7 +447,7 @@ Chunk gen_fixed_chunk()
                     //if (x == 0 && y == 0 && z == 0 && w == 0)
                     //if (x < 5 && x % 2 == 0 && w == y && w == z && w == 0)
                     //if ((x != 0) + (y != 0) + (z != 0) + (w != 0) <= 1)
-                    if (y == CHUNK_SIZE - 1)
+                    //if (y >= CHUNK_SIZE - 4)
                     {
                         *b = BlockType.TEST;
                     }
@@ -444,9 +467,9 @@ Chunk fetch_chunk(ChunkPos loc)
 
     if (
         //true
-        //loc == ChunkPos(-1, -1, -1, 0)
+        loc == ChunkPos(-1, -1, -1, 0)
         //loc.y < 0
-        loc.y == -1
+        //loc.y == -1
         //loc == ChunkPos(0, 0, 0, 0)
         //loc == ChunkPos(1, 0, 1, 0)
         )
@@ -469,108 +492,3 @@ Chunk fetch_chunk(ChunkPos loc)
     return c;
 }
 
-
-// TODO this need some general rethinking
-void load_chunks(Vec4 center, int radius, ref Chunk[ChunkPos] loaded_chunks)
-{
-    static ChunkPos[] load_stack;
-    load_stack.unsafe_reset();
-
-    //GC.disable();
-    //scope(exit) GC.enable();
-
-    ChunkPos center_cp = ChunkPos(center);
-    //if (center_cp in loaded_chunks)
-    if (true)
-    {
-        for (int i = 0; i < 8; i++)
-        {
-            ChunkPos start_cp = void;
-            final switch (i) {
-            case 0: start_cp = center_cp.shift!"x"(radius); break;
-            case 1: start_cp = center_cp.shift!"y"(radius); break;
-            case 2: start_cp = center_cp.shift!"z"(radius); break;
-            case 3: start_cp = center_cp.shift!"w"(radius); break;
-            case 4: start_cp = center_cp.shift!"x"(-radius); break;
-            case 5: start_cp = center_cp.shift!"y"(-radius); break;
-            case 6: start_cp = center_cp.shift!"z"(-radius); break;
-            case 7: start_cp = center_cp.shift!"w"(-radius); break;
-            }
-            if (start_cp !in loaded_chunks)
-            {
-                load_stack ~= start_cp;
-                break;
-            }
-        }
-    }
-    else
-    {
-        load_stack ~= center_cp;
-    }
-
-
-    static ChunkPos[] newly_loaded;
-    newly_loaded.unsafe_reset();
-
-    while (!load_stack.empty())
-    {
-        ChunkPos cp = load_stack.back();
-        load_stack.unsafe_popback();
-
-        if (cp in loaded_chunks)
-        {
-            continue;
-        }
-
-        newly_loaded ~= cp;
-        loaded_chunks[cp] = fetch_chunk(cp);
-        writeln("loaded ", cp);
-        debug(prof) profile_checkpoint();
-
-        for (int i = 0; i < 8; i++)
-        {
-            ChunkPos new_cp = void;
-            final switch (i) {
-            case 0: new_cp = cp.shift!"x"(1); break;
-            case 1: new_cp = cp.shift!"y"(1); break;
-            case 2: new_cp = cp.shift!"z"(1); break;
-            case 3: new_cp = cp.shift!"w"(1); break;
-            case 4: new_cp = cp.shift!"x"(-1); break;
-            case 5: new_cp = cp.shift!"y"(-1); break;
-            case 6: new_cp = cp.shift!"z"(-1); break;
-            case 7: new_cp = cp.shift!"w"(-1); break;
-            }
-            //writeln("try to queue ", new_cp);
-            if (distance(center_cp, new_cp) <= radius && new_cp !in loaded_chunks)
-            {
-                load_stack ~= new_cp;
-            }
-        }
-    }
-
-    // TODO i think this basically works but it overprocesses
-    // should reuse processing_status?
-    foreach (ref cp; newly_loaded) {
-        loaded_chunks[cp].update_from_surroundings(cp, loaded_chunks);
-
-        for (int i = 0; i < 8; i++)
-        {
-            ChunkPos adjacent_cp = void;
-            final switch (i) {
-            case 0: adjacent_cp = cp.shift!"x"(1); break;
-            case 1: adjacent_cp = cp.shift!"y"(1); break;
-            case 2: adjacent_cp = cp.shift!"z"(1); break;
-            case 3: adjacent_cp = cp.shift!"w"(1); break;
-            case 4: adjacent_cp = cp.shift!"x"(-1); break;
-            case 5: adjacent_cp = cp.shift!"y"(-1); break;
-            case 6: adjacent_cp = cp.shift!"z"(-1); break;
-            case 7: adjacent_cp = cp.shift!"w"(-1); break;
-            }
-
-            Chunk* p = adjacent_cp in loaded_chunks;
-            if (p) {
-                p.update_from_surroundings(adjacent_cp, loaded_chunks);
-            }
-        }
-    }
-}

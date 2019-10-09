@@ -76,6 +76,11 @@ const vec3[] colors_alt = {
 
 #define PI 3.1415926535897932384626433832795
 
+// https://stackoverflow.com/questions/4200224/random-noise-functions-for-glsl
+float rand(vec4 seed) {
+    return fract(sin(dot(seed, vec4(12.9898, 78.233, 381.9813, 937.1512))) * 43758.5453);
+}
+
 void main()
 {
     //color = vec4(color_f, 1.0);
@@ -104,8 +109,7 @@ void main()
 
         //uvec4 v1 = uvec4(0, 0, 0, 0);
         uvec4 v2 = ((uvec4(abs(cuboid_pos))) * factors) ^ seeds;
-        uvec4 v = v1 ^ v2;
-
+        uvec4 v = v2;//1 ^ v2;
 
         //uvec3 r = (1103515245 * v + 12345) & 0x7fffffff;
 
@@ -115,6 +119,8 @@ void main()
         //vec3 c = colors_alt[r % colors_alt.length];
         vec3 c = colors[id];
         float a = ((float((r >> 16) & 255) - 127) / 255.) * 0.1;
+        //float a = (rand(vec4(floor(tex_coords * 8), 0)) - 0.5) * 0.4;
+        //a *= (rand(cuboid_pos) - 0.5);
         color = vec4(
             clamp(
                 c + a * vec3(1, 1, 1),

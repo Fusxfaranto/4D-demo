@@ -1,10 +1,11 @@
 
+public import std.conv : to;
 public import std.stdio : write, writeln, writef, writefln;
+public import std.typecons : Tuple, tuple;
 
 import std.traits : OriginalType, isIntegral;
 import std.datetime.stopwatch : StopWatch;
 import std.datetime : to, TickDuration;
-import std.conv : to;
 
 
 enum float LARGE_FLOAT = 1e20;

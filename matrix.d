@@ -159,6 +159,7 @@ enum Vec4BasisSigned
     NW,
 }
 
+// TODO remove these
 Vec4 from_basis(Vec4Basis b) pure
 {
     final switch (b)
@@ -206,6 +207,11 @@ Vec4 from_basis(Vec4BasisSigned b) pure
             return Vec4(0, 0, 0, -1);
     }
 }
+
+Vec4 to_vec4(Vec4BasisSigned b) pure {
+    return from_basis(b);
+}
+
 
 Vec4 cross_p()(auto ref in Vec4 a, auto ref in Vec4 b, auto ref in Vec4 c) pure
 {

@@ -28,7 +28,7 @@ enum
     DisplayMode__SPLIT = 1,
 };
 
-GLFWwindow *w;
+GLFWwindow *window;
 int width, height;
 const char *title;
 int display_mode;
@@ -61,7 +61,7 @@ GLuint compass_tex;
 
 
 // TODO ???
-#define MAX_CUBES_IN_CHUNK (16 * 16 * 16 * 16)
+#define MAX_CUBES_IN_CHUNK (16 * 16 * 16 * 16 * 16)
 typedef struct ChunkGLData {
     GLuint VAO;
     GLuint VBO;
@@ -114,7 +114,7 @@ struct
 
 void cleanup(void)
 {
-    glfwDestroyWindow(w);
+    glfwDestroyWindow(window);
     glDeleteVertexArrays(1, &main_VAO);
     glDeleteBuffers(1, &main_VBO);
     glDeleteVertexArrays(1, &vertical_VAO);
@@ -164,14 +164,14 @@ int init(void)
     glfwWindowHint(GLFW_SAMPLES, 4);
 
 
-    w = glfwCreateWindow(width, height, title, NULL, NULL);
-    if (!w)
+    window = glfwCreateWindow(width, height, title, NULL, NULL);
+    if (!window)
     {
         glfwTerminate();
         return EXIT_FAILURE;
     }
 
-    glfwMakeContextCurrent(w);
+    glfwMakeContextCurrent(window);
 
     // TODO: figure out cross-platform shit for vsync and shit
     glfwSwapInterval(0);
@@ -180,6 +180,9 @@ int init(void)
     glewExperimental = GL_TRUE;
     glewInit();
 
+    //assert(glfwRawMouseMotionSupported());
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    
 
     CHECK_RES(create_shader(&base_shader, "vertex.glsl", NULL, "fragment.glsl"));
     CHECK_RES(create_shader(&compass_shader, "compass_vertex.glsl", NULL, "compass_fragment.glsl"));
@@ -423,6 +426,15 @@ void finish_chunk_gl_data(ChunkGLData *data, size_t cubes_written) {
     printf("wrote %lu\n", cubes_written);
 }
 
+void free_chunk_gl_data(ChunkGLData *data) {
+    assert(data);
+
+    glDeleteBuffers(1, &data->VBO);
+    glDeleteVertexArrays(1, &data->VAO);
+
+    free(data);
+}
+
 
 void render_cuboids(/*const*/ ChunkGLData **data, const CuboidShaderData* uniforms) {
     assert(data);
@@ -480,9 +492,9 @@ void render_cuboids(/*const*/ ChunkGLData **data, const CuboidShaderData* unifor
 // TODO i don't think these state changes are in the optimal order
 void render(void)
 {
-    glfwSetWindowTitle(w, title);
+    glfwSetWindowTitle(window, title);
 
-    glfwGetFramebufferSize(w, &width, &height);
+    glfwGetFramebufferSize(window, &width, &height);
     float ratio = width / (float) height;
 
     float cw = fmax(width, height) / 2.0;
@@ -552,7 +564,7 @@ void render(void)
             glViewport(0, 0, width / 2, height);
 
             glBindFramebuffer(GL_FRAMEBUFFER, vertical_fb);
-            glClearColor(1, 1, 0, 1);
+            glClearColor(130.0 / 255.0, 167.0 / 255.0, 90.0 / 255.0, 1.0);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             render_cuboids(cuboid_data_vertical, &cuboid_uniforms_vertical);
             break;
@@ -646,8 +658,7 @@ void render(void)
         }
     }
 
-
-    glfwSwapBuffers(w);
+    glfwSwapBuffers(window);
 }
 
 

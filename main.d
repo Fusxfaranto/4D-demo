@@ -17,6 +17,11 @@ import cross_section;
 import world;
 
 
+World w;
+
+BlockFace targeted_block = BlockFace.INVALID;
+
+
 Vec3 camera_pos = Vec3(0, 0, 3);
 // EMV3 camera_front = EMV3(0, 0, 0, -1);
 // Vec3 camera_up = Vec3(0, 1, 0);
@@ -67,42 +72,41 @@ void main()
     Vec3 compass_base_ = Vec3(0, 0, 0);
     compass_base = compass_base_.data();
 
-
-    World world;/*
-                  world.scene ~= tesseract(Vec4(-30, -30, -30, -30), Vec4(60, 60, 60, 60));
-                  world.scene ~= tesseract(Vec4(-10, -2, -10, -10), Vec4(20, 2, 20, 20));
-                  world.scene ~= tesseract(Vec4(-3.5, 2, -6, 3), Vec4(1, 1, 1, 1),
+/*
+                  w.scene ~= tesseract(Vec4(-30, -30, -30, -30), Vec4(60, 60, 60, 60));
+                  w.scene ~= tesseract(Vec4(-10, -2, -10, -10), Vec4(20, 2, 20, 20));
+                  w.scene ~= tesseract(Vec4(-3.5, 2, -6, 3), Vec4(1, 1, 1, 1),
                   rot(Vec4(1, 1, 1, 1), Vec4(0, 0, 0, 1), deg_to_rad(45)));
-                  world.scene ~= tesseract(Vec4(-.5, 0, -3, 0), Vec4(1, 1, 1, 1));
-                  world.scene ~= tesseract(Vec4(1, 0, -3, 0), Vec4(1, 1, 1, 5));
-                  world.scene ~= tesseract(Vec4(0, 0, 3, 0));
-                  world.scene ~= tesseract(Vec4(0, 0, 4, 0));
-                  world.scene ~= tesseract(Vec4(0, 0, 5, 0));
-                  world.scene ~= tesseract(Vec4(1, 0, 4, 0));
-                  world.scene ~= tesseract(Vec4(-1, 0, 4, 0));
-                  world.scene ~= tesseract(Vec4(0, 0, 4, 1));
-                  world.scene ~= tesseract(Vec4(0, 0, 4, -1));
-                  world.scene ~= tesseract(Vec4(0, 1, 4, 0));
-                  world.scene ~= fivecell(Vec4(4, 2, 4, 0));
-                  world.scene ~= tesseract(Vec4(4, 0, -4, 0), Vec4(0.2, 1.5, 3, 1));
-                  world.scene ~= tesseract(Vec4(5.6, 0, -4, 0), Vec4(0.2, 1.5, 3, 1));
-                  world.scene ~= tesseract(Vec4(4.2, 0, -4, 0), Vec4(1.4, 1.5, 0.2, 1));
-                  world.scene ~= tesseract(Vec4(4.2, 0, -1.2, 0), Vec4(1.4, 1.5, 0.2, 1));
-                  world.scene ~= tesseract(Vec4(4, 1.5, -4, 0), Vec4(1.8, 0.2, 3, 1));*/
+                  w.scene ~= tesseract(Vec4(-.5, 0, -3, 0), Vec4(1, 1, 1, 1));
+                  w.scene ~= tesseract(Vec4(1, 0, -3, 0), Vec4(1, 1, 1, 5));
+                  w.scene ~= tesseract(Vec4(0, 0, 3, 0));
+                  w.scene ~= tesseract(Vec4(0, 0, 4, 0));
+                  w.scene ~= tesseract(Vec4(0, 0, 5, 0));
+                  w.scene ~= tesseract(Vec4(1, 0, 4, 0));
+                  w.scene ~= tesseract(Vec4(-1, 0, 4, 0));
+                  w.scene ~= tesseract(Vec4(0, 0, 4, 1));
+                  w.scene ~= tesseract(Vec4(0, 0, 4, -1));
+                  w.scene ~= tesseract(Vec4(0, 1, 4, 0));
+                  w.scene ~= fivecell(Vec4(4, 2, 4, 0));
+                  w.scene ~= tesseract(Vec4(4, 0, -4, 0), Vec4(0.2, 1.5, 3, 1));
+                  w.scene ~= tesseract(Vec4(5.6, 0, -4, 0), Vec4(0.2, 1.5, 3, 1));
+                  w.scene ~= tesseract(Vec4(4.2, 0, -4, 0), Vec4(1.4, 1.5, 0.2, 1));
+                  w.scene ~= tesseract(Vec4(4.2, 0, -1.2, 0), Vec4(1.4, 1.5, 0.2, 1));
+                  w.scene ~= tesseract(Vec4(4, 1.5, -4, 0), Vec4(1.8, 0.2, 3, 1));*/
 
 
-    world.scene.length = 0;
-    //world.scene ~= tesseract!(false, solid_color_gen!(0.5, 0.5, 0.5))(Vec4(-30, -30, -30, -30), Vec4(60, 60, 60, 60));
-    //world.scene ~= tesseract!(false, solid_color_gen!(0.5, 0.5, 0.5))(Vec4(-500, -500, -500, -500), Vec4(1000, 1000, 1000, 1000));
-    //world.scene ~= tesseract!(false, solid_color_gen!(0.6, 0.5, 0.1))(Vec4(-10, -2, -10, -10), Vec4(20, 2, 20, 20));
-    //world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, 5, 0), Vec4(1, 3, 1, 1));
-    //world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, -5, 0), Vec4(1, 3, 1, 1));
-    //world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(-5, 0, 5, 0), Vec4(1, 3, 1, 1));
-    //world.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(-5, 0, -5, 0), Vec4(1, 3, 1, 1));
-    //world.scene ~= tesseract!(true)(Vec4(0, 1, 1, 0.5), Vec4(1, 1, 1, 1));
+    w.scene.length = 0;
+    //w.scene ~= tesseract!(false, solid_color_gen!(0.5, 0.5, 0.5))(Vec4(-30, -30, -30, -30), Vec4(60, 60, 60, 60));
+    //w.scene ~= tesseract!(false, solid_color_gen!(0.5, 0.5, 0.5))(Vec4(-500, -500, -500, -500), Vec4(1000, 1000, 1000, 1000));
+    //w.scene ~= tesseract!(false, solid_color_gen!(0.6, 0.5, 0.1))(Vec4(-10, -2, -10, -10), Vec4(20, 2, 20, 20));
+    //w.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, 5, 0), Vec4(1, 3, 1, 1));
+    //w.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(5, 0, -5, 0), Vec4(1, 3, 1, 1));
+    //w.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(-5, 0, 5, 0), Vec4(1, 3, 1, 1));
+    //w.scene ~= tesseract!(false, solid_color_gen!(0.8, 0.1, 0.1))(Vec4(-5, 0, -5, 0), Vec4(1, 3, 1, 1));
+    //w.scene ~= tesseract!(true)(Vec4(0, 1, 1, 0.5), Vec4(1, 1, 1, 1));
 
 
-    //world.scene ~= tesseract(Vec4(1, 1, 1, 0));
+    //w.scene ~= tesseract(Vec4(1, 1, 1, 0));
 
     //view_mat = look_at(camera_pos, Vec3(0, 0, 0), Vec3(0, 1, 0));
     view_mat = Mat4.init;
@@ -117,9 +121,8 @@ void main()
     handle_errors!init();
     scope(exit) cleanup();
 
-    glfwSetKeyCallback(w, &key_callback);
-
-    BlockPos targeted_block = BlockPos.INVALID;
+    glfwSetKeyCallback(window, &key_callback);
+    glfwSetMouseButtonCallback(window, &mouse_button_callback);
 
     int t = 0;
     int last_width = -1, last_height = -1;
@@ -128,7 +131,7 @@ void main()
     float[30] fpss;
     debug(prof) sw.start();
 
-    while (!glfwWindowShouldClose(w) && !do_close)
+    while (!glfwWindowShouldClose(window) && !do_close)
     {
         debug(prof) writeln("tick start");
         debug(prof) sw.reset();
@@ -222,11 +225,11 @@ void main()
                 flat_front.x, flat_front.y, flat_front.z, flat_front.w,
                 flat_normal.x, flat_normal.y, flat_normal.z, flat_normal.w,
                 );
-            world.character = tesseract!true(char_pos, 0.6 * Vec4(0.3, 0.8, 0.3, 0.3), r);
+            w.character = tesseract!true(char_pos, 0.6 * Vec4(0.3, 0.8, 0.3, 0.3), r);
         }
         else
         {
-            world.character = [];
+            w.character = [];
         }
 
         Vec3 compass_ = Vec3(-flat_front.x, flat_front.w, flat_front.z) + compass_base_;
@@ -234,20 +237,60 @@ void main()
         debug(prof) profile_checkpoint();
 
         float render_radius = 700;
-        //load_chunks(char_pos, cast(int)(render_radius / CHUNK_SIZE) + 1, world.loaded_chunks);
-        load_chunks(char_pos, 4, world.loaded_chunks);
+        //load_chunks(char_pos, cast(int)(render_radius / CHUNK_SIZE) + 1, w.loaded_chunks);
+        w.load_chunks(char_pos, 2);
 
-        scratch_strings ~= to!string(world.loaded_chunks.length);
+        //scratch_strings ~= to!string(w.loaded_chunks.length);
         //scratch_strings ~= to!string(coords_to_chunkpos(char_pos));
         {
             // TODO i don't really get why char_front is "backwards" like this
-            targeted_block = world.target_nonempty(char_pos, -1 * char_front);
-            //BlockPos b = world.target_nonempty(Vec4(1, 2, 3, 4), Vec4(0, -1, 0, 0));
-            if (targeted_block != BlockPos.INVALID) {
-                //scratch_strings ~= to!string(b);
-                world.scene = tesseract(targeted_block.to_vec4(), 1.001 * Vec4(1, 1, 1, 1));
+            targeted_block = w.target_nonempty(char_pos, -1 * char_front);
+            //BlockPos b = w.target_nonempty(Vec4(1, 2, 3, 4), Vec4(0, -1, 0, 0));
+            if (targeted_block != BlockFace.INVALID) {
+                scratch_strings ~= to!string(targeted_block);
+                enum F = 0.0003;
+                size_t loc;
+                final switch (targeted_block.face) {
+                case Vec4BasisSigned.NX:
+                    loc = 2 * 5;
+                    break;
+
+                case Vec4BasisSigned.NY:
+                    loc = 4 * 5;
+                    break;
+
+                case Vec4BasisSigned.NZ:
+                    loc = 6 * 5;
+                    break;
+
+                case Vec4BasisSigned.NW:
+                    loc = 0 * 5;
+                    break;
+
+                case Vec4BasisSigned.X:
+                    loc = 3 * 5;
+                    break;
+
+                case Vec4BasisSigned.Y:
+                    loc = 5 * 5;
+                    break;
+
+                case Vec4BasisSigned.Z:
+                    loc = 7 * 5;
+                    break;
+
+                case Vec4BasisSigned.W:
+                    loc = 1 * 5;
+                    break;
+
+                }
+                w.scene = tesseract!(false, solid_color_gen!(0.6, 0.6, 0.6))(
+                    targeted_block.pos.to_vec4() - F * Vec4(1, 1, 1, 1),
+                    (1 + 2 * F) * Vec4(1, 1, 1, 1),
+                    )[loc..(loc + 5)];
             } else {
                 //scratch_strings ~= "none";
+                w.scene = [];
             }
         }
         debug(prof) profile_checkpoint();
@@ -270,7 +313,7 @@ void main()
 
                 cuboid_uniforms_vertical.edge_ordering = &edge_ordering_vertical[0][0][0];
             }
-            generate_cross_section(world, &cuboid_data_vertical[0], vertical_objects, render_radius, cube_culling,
+            generate_cross_section(w, &cuboid_data_vertical[0], vertical_objects, render_radius, cube_culling,
                                    char_pos, flat_normal, flat_front, global_up, flat_right);
             debug(prof) profile_checkpoint();
             goto case DisplayMode.NORMAL;
@@ -295,7 +338,7 @@ void main()
             }
 
             //scratch_strings.length = 0;
-            generate_cross_section(world, &cuboid_data[0], objects, render_radius, cube_culling,
+            generate_cross_section(w, &cuboid_data[0], objects, render_radius, cube_culling,
                           char_pos, char_up, char_front, char_normal, char_right);
             debug(prof) profile_checkpoint();
         }
@@ -324,7 +367,38 @@ void main()
     }
 }
 
+extern (C) void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
+{
+    if (action != GLFWKeyStatus.GLFW_PRESS) {
+        return;
+    }
 
+    if (targeted_block == BlockFace.INVALID) {
+        return;
+    }
+
+    switch (button) {
+    case GLFWMouseButton.GLFW_MOUSE_BUTTON_LEFT:
+        if (true) {
+            writeln(targeted_block);
+            BlockPos new_pos = targeted_block.pos + targeted_block.face.to_ipos!BlockPos();
+            writefln("creating at %s", new_pos);
+            w.set_block(new_pos, BlockType.TEST);
+        }
+        break;
+
+    case GLFWMouseButton.GLFW_MOUSE_BUTTON_RIGHT:
+        if (true) {
+            writefln("deleting at %s", targeted_block.pos);
+            w.set_block(targeted_block.pos, BlockType.NONE);
+            targeted_block = BlockFace.INVALID;
+        }
+        break;
+
+    default:
+        break;
+    }
+}
 
 extern (C) void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -389,6 +463,27 @@ extern (C) void key_callback(GLFWwindow* window, int key, int scancode, int acti
     case GLFWKey.GLFW_KEY_BACKSPACE:
     {
         char_enabled ^= true;
+        break;
+    }
+
+    case GLFWKey.GLFW_KEY_LEFT_BRACKET:
+    {
+        if (targeted_block != BlockFace.INVALID) {
+            writeln(targeted_block);
+            BlockPos new_pos = targeted_block.pos + targeted_block.face.to_ipos!BlockPos();
+            writefln("creating at %s", new_pos);
+            w.set_block(new_pos, BlockType.TEST);
+        }
+        break;
+    }
+
+    case GLFWKey.GLFW_KEY_RIGHT_BRACKET:
+    {
+        if (targeted_block != BlockFace.INVALID) {
+            writefln("deleting at %s", targeted_block.pos);
+            w.set_block(targeted_block.pos, BlockType.NONE);
+            targeted_block = BlockFace.INVALID;
+        }
         break;
     }
 
@@ -613,16 +708,47 @@ void process_input()
     }
 
 
+    // mouse movement
+    {
+        immutable double mouse_speed = 0.001;
+        double xpos, ypos;
+        glfwGetCursorPos(window, &xpos, &ypos);
+        writefln("%f %f", xpos, ypos);
 
-    // if (get_key(GLFWKey.GLFW_KEY_T) == GLFWKeyStatus.GLFW_PRESS)
-    // {
-    //     test_angle += rot_speed;
-    // }
-    // if (get_key(GLFWKey.GLFW_KEY_G) == GLFWKeyStatus.GLFW_PRESS)
-    // {
-    //     test_angle -= rot_speed;
-    // }
 
+        if (get_key(GLFWKey.GLFW_KEY_LEFT_ALT) == GLFWKeyStatus.GLFW_PRESS) {
+            if (xpos != 0) {
+                Mat4 r = rot!false(global_up, char_normal, xpos * mouse_speed);
+                char_front = (r * char_front).normalized();
+                char_up = (r * char_up).normalized();
+            }
+            if (ypos != 0) {
+                Mat4 r = rot!false(global_up, cross_p(char_up, char_front, char_normal), ypos * mouse_speed);
+                char_front = (r * char_front).normalized();
+                char_normal = (r * char_normal).normalized();
+                char_up = (r * char_up).normalized();
+            }
+        } else {
+            if (xpos != 0) {
+                Mat4 r = rot!false(global_up, char_normal, xpos * mouse_speed);
+                char_front = (r * char_front).normalized();
+                char_up = (r * char_up).normalized();
+            }
+            if (ypos != 0) {
+                if (
+                    (char_front.y > -y_limit && ypos < 0) ||
+                    (char_front.y < y_limit && ypos > 0)
+                    )
+                {
+                    Mat4 r = rot(char_up, char_front, -ypos * mouse_speed);
+                    char_front = (r * char_front).normalized();
+                    char_up = (r * char_up).normalized();
+                }
+            }
+        }
+
+        glfwSetCursorPos(window, 0, 0);
+    }
 
 
     // TODO: else if?
