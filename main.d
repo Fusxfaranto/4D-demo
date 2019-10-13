@@ -25,7 +25,7 @@ BlockFace targeted_block = BlockFace.INVALID;
 Vec3 camera_pos = Vec3(0, 0, 3);
 // EMV3 camera_front = EMV3(0, 0, 0, -1);
 // Vec3 camera_up = Vec3(0, 1, 0);
-float fov = deg_to_rad(45);
+float fov;
 
 Vec4 char_pos = Vec4(0, 0.4, 0, 0.5);
 Vec4 char_front = Vec4(0, 0.3, 1, 0).normalized();
@@ -36,7 +36,7 @@ enum Vec4 global_up = Vec4(0, 1, 0, 0);
 Mat4 view_mat, projection_mat, compass_projection_mat;
 
 bool char_enabled = false;
-bool force_window_size_update = false;
+bool force_window_size_update = true;
 bool cube_culling = true;
 
 
@@ -126,7 +126,7 @@ void main()
 
     int t = 0;
     int last_width = -1, last_height = -1;
-    float last_fov = fov;
+    //float last_fov = fov;
     TickDuration last_time;
     float[30] fpss;
     debug(prof) sw.start();
@@ -144,8 +144,9 @@ void main()
         process_input();
         debug(prof) profile_checkpoint();
 
-        if (force_window_size_update || last_width != width || last_height != height || last_fov != fov)
+        if (force_window_size_update || last_width != width || last_height != height)
         {
+            fov = deg_to_rad(45);
             float r = cast(float)(width) / height;
             final switch (display_mode.to!DisplayMode)
             {
@@ -154,6 +155,7 @@ void main()
 
             case DisplayMode.SPLIT:
                 r /= 2;
+                fov *= 1.5;
                 break;
             }
             projection_mat = perspective(fov, r, 0.1, 1000);
@@ -161,7 +163,7 @@ void main()
             //projection_mat = orthographic(-width / 400.0, width / 400.0, -height / 400.0, height / 400.0, -10, 100);
             last_height = height;
             last_width = width;
-            last_fov = fov;
+            //last_fov = fov;
             force_window_size_update = false;
 
             handle_errors!window_size_update();
@@ -238,7 +240,7 @@ void main()
 
         float render_radius = 700;
         //load_chunks(char_pos, cast(int)(render_radius / CHUNK_SIZE) + 1, w.loaded_chunks);
-        w.load_chunks(char_pos, 2);
+        w.load_chunks(char_pos, 7);
 
         //scratch_strings ~= to!string(w.loaded_chunks.length);
         //scratch_strings ~= to!string(coords_to_chunkpos(char_pos));
@@ -713,7 +715,7 @@ void process_input()
         immutable double mouse_speed = 0.001;
         double xpos, ypos;
         glfwGetCursorPos(window, &xpos, &ypos);
-        writefln("%f %f", xpos, ypos);
+        //writefln("%f %f", xpos, ypos);
 
 
         if (get_key(GLFWKey.GLFW_KEY_LEFT_ALT) == GLFWKeyStatus.GLFW_PRESS) {

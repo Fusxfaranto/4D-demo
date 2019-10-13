@@ -26,8 +26,7 @@ extern (C) int init();
 enum MAX_RENDERED_CHUNKS = 8191;
 extern (C) extern __gshared ChunkGLData*[MAX_RENDERED_CHUNKS + 1] cuboid_data;
 extern (C) extern __gshared ChunkGLData*[MAX_RENDERED_CHUNKS + 1] cuboid_data_vertical;
-extern (C) void* gen_chunk_gl_data(ChunkGLData**);
-extern (C) void finish_chunk_gl_data(ChunkGLData*, size_t);
+extern (C) void assign_chunk_gl_data(ChunkGLData**, float*, int);
 extern (C) void free_chunk_gl_data(ChunkGLData*);
 
 struct CuboidShaderData {

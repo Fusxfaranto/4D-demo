@@ -85,6 +85,8 @@ void main()
 {
     //color = vec4(color_f, 1.0);
 
+    vec4 sub_cube_pos = cuboid_pos;
+
     if (true) {
         const uvec4 seeds = uvec4(
             267840417,
@@ -108,7 +110,7 @@ void main()
         uvec4 v1 = ((uvec4(tex_coords * 8, 0) + uvec4(1, 1, 1, 1)) * factors) ^ seeds;
 
         //uvec4 v1 = uvec4(0, 0, 0, 0);
-        uvec4 v2 = ((uvec4(abs(cuboid_pos))) * factors) ^ seeds;
+        uvec4 v2 = ((uvec4(abs(sub_cube_pos))) * factors) ^ seeds;
         uvec4 v = v2;//1 ^ v2;
 
         //uvec3 r = (1103515245 * v + 12345) & 0x7fffffff;

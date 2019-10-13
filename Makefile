@@ -16,13 +16,16 @@ OBJS := $(C_OBJS) $(D_OBJS)
 #CC := ./gdc/x86_64-pc-linux-gnu/bin/x86_64-linux-gnu-gcc
 #DC := ./gdc/x86_64-pc-linux-gnu/bin/x86_64-linux-gnu-gdc
 #DC := ./ldc/build/bin/ldc2
+#DC := gdc
 #DC := ldc2
 DC := dmd
 
 CFLAGS := -m64 -g -c -O3 -std=c11 -pedantic -Wall -Werror -Wno-error=unused-variable #-I/usr/include/freetype2/ #-Iftgl/src/
-DFLAGS := -m64 -g -c -O -profile=gc -debug=prof
-#DFLAGS := -vgc
+DFLAGS := -m64 -g -c -O
+#DFLAGS += -d-debug=prof
+#DFLAGS += -profile=gc -debug=prof
 #LDFLAGS := -Llib -lm -lSOIL -lGLEW -lglfw -lGL
+
 LDFLAGS := -L-Llib
 LDFLAGS += -L-lm
 LDFLAGS += -L-lSOIL

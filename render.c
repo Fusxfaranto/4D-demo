@@ -61,12 +61,16 @@ GLuint compass_tex;
 
 
 // TODO ???
-#define MAX_CUBES_IN_CHUNK (16 * 16 * 16 * 16 * 16)
+#define MAX_CUBES_IN_CHUNK (16 * 16 * 16 * 16 * 2)
+//#define MAX_CUBES_IN_CHUNK (4096)
 typedef struct ChunkGLData {
     GLuint VAO;
     GLuint VBO;
     GLsizei len;
 } ChunkGLData;
+#define CHUNK_DATA_POOL_MAX 2048
+ChunkGLData *chunk_data_pool[CHUNK_DATA_POOL_MAX];
+size_t chunk_data_pool_len;
 
 #define MAX_RENDERED_CHUNKS 8191
 GLuint cuboid_shader;
@@ -398,41 +402,68 @@ void render_objects(FloatDArray os, GLuint VAO, GLuint VBO)
 }
 
 
-// TODO use a pool for these instead of making them fresh each time a chunk is loaded
-void* gen_chunk_gl_data(ChunkGLData **data_p) {
-    assert(data_p);
-    ChunkGLData *data = calloc(1, sizeof(ChunkGLData));
-    assert(data);
-    *data_p = data;
-
-    glGenBuffers(1, &data->VBO);
-    glGenVertexArrays(1, &data->VAO);
-    glBindVertexArray(data->VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, data->VBO);
-    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (GLvoid*)0);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (GLvoid*)(4 * sizeof(GLfloat)));
-    glEnableVertexAttribArray(1);
-
-    glBufferData(GL_ARRAY_BUFFER, MAX_CUBES_IN_CHUNK * 8 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
-    return glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
-}
-
-void finish_chunk_gl_data(ChunkGLData *data, size_t cubes_written) {
-    assert(data);
-    glUnmapBuffer(GL_ARRAY_BUFFER);
-    assert(cubes_written <= MAX_CUBES_IN_CHUNK);
-    data->len = cubes_written;
-    printf("wrote %lu\n", cubes_written);
-}
-
 void free_chunk_gl_data(ChunkGLData *data) {
     assert(data);
 
-    glDeleteBuffers(1, &data->VBO);
-    glDeleteVertexArrays(1, &data->VAO);
+    if (chunk_data_pool_len < CHUNK_DATA_POOL_MAX) {
+        chunk_data_pool[chunk_data_pool_len++] = data;
+    } else {
+        free(data);
+        
+        glDeleteBuffers(1, &data->VBO);
+        glDeleteVertexArrays(1, &data->VAO);
+        
+        // TODO there's nothing really wrong here but i don't want to see this happen in practice
+        assert(0);
+    }
+}
 
-    free(data);
+void assign_chunk_gl_data(ChunkGLData **data_p, float* cube_corners, int cube_corners_len) {
+    assert(data_p);
+    assert(cube_corners_len % 8 == 0);
+    ChunkGLData *data;
+
+    if (*data_p && (*data_p)->len * 8 < cube_corners_len) {
+        free_chunk_gl_data(*data_p);
+        *data_p = NULL;
+    }
+
+    if (*data_p == NULL) {
+        if (chunk_data_pool_len > 0) {
+            data = chunk_data_pool[--chunk_data_pool_len];
+            assert(data);
+        
+            glBindBuffer(GL_ARRAY_BUFFER, data->VBO);
+        } else {
+            data = calloc(1, sizeof(ChunkGLData));
+            assert(data);
+
+            glGenBuffers(1, &data->VBO);
+            glGenVertexArrays(1, &data->VAO);
+            glBindVertexArray(data->VAO);
+            glBindBuffer(GL_ARRAY_BUFFER, data->VBO);
+            glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (GLvoid*)0);
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 8 * sizeof(GLfloat), (GLvoid*)(4 * sizeof(GLfloat)));
+            glEnableVertexAttribArray(1);
+
+        }
+        glBufferData(GL_ARRAY_BUFFER, cube_corners_len * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+        
+        *data_p = data;
+    } else {
+        data = *data_p;
+        glBindBuffer(GL_ARRAY_BUFFER, data->VBO);
+    }
+    
+    printf("%p\twrote %d\n", (void*)data, cube_corners_len);
+
+    glBufferSubData(GL_ARRAY_BUFFER, 0, cube_corners_len * sizeof(float), cube_corners);
+    data->len = cube_corners_len / 8;
+    
+    /* for (int j = 0; j < data->len; j++) { */
+    /*     printf("%.2f %.2f %.2f %.2f\t %.2f %.2f %.2f %.2f\n", cube_corners[j], cube_corners[j + 1], cube_corners[j + 2], cube_corners[j + 3], cube_corners[j + 4], cube_corners[j + 5], cube_corners[j + 6], cube_corners[j + 7]); */
+    /* } */
 }
 
 
@@ -483,7 +514,7 @@ void render_cuboids(/*const*/ ChunkGLData **data, const CuboidShaderData* unifor
         glBindVertexArray(data[i]->VAO);
         glDrawArrays(GL_POINTS, 0, data[i]->len);
         if (data[i]->len > 0) {
-            //printf("%d\n", data[i]->len);
+            //printf("%d\t%d\n", data[i]->VAO, data[i]->len);
         }
     }
 }
@@ -573,8 +604,10 @@ void render(void)
             assert(0);
         }
     }
-
+    
     {
+        // TODO gross and bad
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         glUseProgram(base_shader);
 
         switch (display_mode)
@@ -609,6 +642,8 @@ void render(void)
         default:
             assert(0);
         }
+    
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     }
 
 

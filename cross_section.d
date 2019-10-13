@@ -61,6 +61,7 @@ void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[
         //writeln("processing ", cp);
         //scratch_strings ~= cp.to!string();
         processed_cps ~= cp;
+        assert(c.processing_status == ChunkProcessingStatus.NOT_PROCESSED);
         c.processing_status = ChunkProcessingStatus.PROCESSED;
 
         assert(c.state != ChunkDataState.INVALID);
@@ -71,6 +72,7 @@ void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[
 
         case ChunkDataState.LOADED:
             assert(c.gl_data);
+            //writefln("adding %s", cp);
             *gl_data_p++ = c.gl_data;
             break;
 

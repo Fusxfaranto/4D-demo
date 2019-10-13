@@ -172,13 +172,13 @@ struct World
 
         final switch (c.state) {
         case ChunkDataState.INVALID:
+        case ChunkDataState.OCCLUDED_UNLOADED: // TODO
             assert(0);
 
         case ChunkDataState.EMPTY:
             return BlockType.NONE;
 
         case ChunkDataState.LOADED:
-        case ChunkDataState.OCCLUDED_UNLOADED: // TODO
             assert(c.data);
             return c.data.grid[rel_p.x][rel_p.y][rel_p.z][rel_p.w];
         }
@@ -196,6 +196,7 @@ struct World
 
         final switch (c.state) {
         case ChunkDataState.INVALID:
+        case ChunkDataState.OCCLUDED_UNLOADED: // TODO
             assert(0);
 
         case ChunkDataState.EMPTY:
@@ -203,7 +204,6 @@ struct World
             goto case ChunkDataState.LOADED;
 
         case ChunkDataState.LOADED:
-        case ChunkDataState.OCCLUDED_UNLOADED: // TODO
             assert(c.data);
             c.data.grid[rel_p.x][rel_p.y][rel_p.z][rel_p.w] = t;
         }
@@ -273,7 +273,7 @@ struct World
 
         } while (distance(start_pos, base_pos) < max_dist);
 
-        writeln("reached max dist");
+        //writeln("reached max dist");
         return BlockFace.INVALID;
     }
 }
