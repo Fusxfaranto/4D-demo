@@ -21,7 +21,10 @@ layout(location = 4) uniform vec4 front;
 layout(location = 5) uniform mat4 view;
 layout(location = 6) uniform mat4 projection;
 
-layout(location = 7) uniform int[8][8][6] edge_ordering;
+
+layout (std140, binding = 2) uniform CrossSectionData {
+    ivec4[256][2] selected_edges;
+};
 
 
 const vec4[4][8] corner_offsets = {
@@ -109,6 +112,33 @@ const ivec2[12] adjacent_corners = {
 };
 
 
+
+void draw_debug_rectangle(vec4 v, float offset)
+{
+    gl_Position = vec4(-0.5 + offset, -1, 0, 1);
+    //color_f = vec3(v.x, v.x, v.x);
+    EmitVertex();
+    gl_Position = vec4(-0.5 + offset, -1, 0, 1);
+    //color_f = vec3(v.x, v.x, v.x);
+    EmitVertex();
+
+    gl_Position = vec4(-0.5 + offset, -0.5, 0, 1);
+    //color_f = vec3(v.y, v.y, v.y);
+    EmitVertex();
+
+    gl_Position = vec4(-1 + offset, -1, 0, 1);
+    //color_f = vec3(v.z, v.z, v.z);
+    EmitVertex();
+
+    gl_Position = vec4(-1 + offset, -0.5, 0, 1);
+    //color_f = vec3(v.w, v.w, v.w);
+    EmitVertex();
+    gl_Position = vec4(-1 + offset, -0.5, 0, 1);
+    //color_f = vec3(v.w, v.w, v.w);
+}
+
+
+
 void main()
 {
     // TODO these get compiled out, right??
@@ -133,6 +163,7 @@ void main()
 
     vec4[8] rel_pos;
     //bool[8] pos_side;
+    int pos_side_b = 0;
 
     float closest_neg_dist = -1e20;
     int closest = -1;
@@ -142,6 +173,7 @@ void main()
     for (int i = 0; i < 8; i++) {
         rel_pos[i] = rel_corner * corner_offsets[unsigned_orientation][i] + rel_pos_v;
         //pos_side[i] = dot(rel_pos[i], normal) > 0;
+        pos_side_b += int(dot(rel_pos[i], normal) > 0) << i;
         float signed_dist = dot(rel_pos[i], normal);
         any_nonnegative |= int(signed_dist >= 0);
 
@@ -151,34 +183,29 @@ void main()
         }
     }
 
-    if (closest == -1 || any_nonnegative == 0) {
+    // NO
+    // if ((pos_side_b & 0x80) == 0) {
+    //     pos_side_b = ~pos_side_b & 0xff;
+    // }
+    // pos_side_b = ~pos_side_b & 0xff;
+
+    if (pos_side_b >= 256) {
+        draw_debug_rectangle(vec4(1, 1, 1, 1), 0);
+
         EndPrimitive();
         return;
     }
 
+
     for (int i = 0; i < 6; i++) {
-        int edge = edge_ordering[signed_orientation][closest][i];
+        int edge = selected_edges[pos_side_b][int(i > 3)][i & 3];
         if (edge == -1) {
             break;
         }
 
         int corner_a = adjacent_corners[edge][0];
         int corner_b = adjacent_corners[edge][1];
-            
-        //color_f = colors[signed_orientation];
-        //color_f = colors[closest];
-        //color_f = vec3(1, 0, 0);
 
-        // this is hopefully always true
-        // assert(pos_side[corner_a] != pos_side[corner_b]);
-        // if (sign(dot(rel_pos[corner_a], normal)) == sign(dot(rel_pos[corner_b], normal))) {
-        //     //break;
-        //     color_f = vec3(0, 0, 1);
-        // }
-
-        //color_f *= edge / 11.0;
-        //color_f = colors[edge];
-            
         vec4 diff = rel_pos[corner_a] - rel_pos[corner_b];
         float scale = dot(rel_pos[corner_a], normal) * -1.0 / dot(normal, diff);
         vec4 rel_intersection_point = rel_pos[corner_a] + scale * diff;

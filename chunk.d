@@ -157,6 +157,15 @@ struct ChunkGrid(T) {
     static IT get_w(IT)(IT b) {
         return b % CHUNK_SIZE;
     }
+
+    static IT[4] get_coords(IT)(IT b) {
+        IT[4] a = void;
+        a[0] = get_x(b);
+        a[1] = get_y(b);
+        a[2] = get_z(b);
+        a[3] = get_w(b);
+        return a;
+    }
 }
 alias ChunkData = ChunkGrid!BlockType;
 
@@ -407,8 +416,9 @@ struct Chunk
                     break;
                 }
 
-                writeln(vert_data[$-8..$]);
+                //writefln("%s\t%s %s", dir, vert_data[$-8..$-4], vert_data[$-4..$]);
             }
+            //writefln("%s %s %s %s \t%s %s %s %s", x, y, z, w, x_len, y_len, z_len, w_len);
 
             process_cuboid(blockoid_pos, Vec4BasisSigned.NX);
             process_cuboid(blockoid_pos, Vec4BasisSigned.NY);
@@ -489,7 +499,7 @@ struct Chunk
                 }
 
                 int cur_w_boundary = w_boundary + i - first_unfilled;
-                assert(cur_w_boundary <= BLOCKS_IN_CHUNK);
+                assert(cur_w_boundary < BLOCKS_IN_CHUNK + 1);
                 bool all_match = true;
                 for (int j = i; j < cur_w_boundary; j++) {
                     if (data.data[j] != data.data[first_unfilled]) {
@@ -519,14 +529,14 @@ struct Chunk
                 }
 
                 int cur_z_boundary = z_boundary + i - first_unfilled;
-                //writefln("%d %d", i, cur_z_boundary);
-                assert(cur_z_boundary <= BLOCKS_IN_CHUNK);
+                //writefln("%s\t%s\t%s", ChunkData.get_coords(y_boundary), ChunkData.get_coords(cur_z_boundary), ChunkData.get_coords(i));
+                assert(cur_z_boundary < BLOCKS_IN_CHUNK + CHUNK_SIZE);
                 bool all_match = true;
             y_outer:
                 for (int j = i; j < cur_z_boundary; j += CHUNK_SIZE)
                 {
                     int cur_w_boundary = w_boundary + j - first_unfilled;
-                    assert(cur_w_boundary <= BLOCKS_IN_CHUNK);
+                    assert(cur_w_boundary < BLOCKS_IN_CHUNK + 1);
                     for (int k = j; k < cur_w_boundary; k++) {
                         if (data.data[k] != data.data[first_unfilled]) {
                             all_match = false;
@@ -559,14 +569,17 @@ struct Chunk
                 }
 
                 int cur_y_boundary = y_boundary + i - first_unfilled;
+                assert(cur_y_boundary < BLOCKS_IN_CHUNK + CHUNK_SIZE ^^ 2);
                 bool all_match = true;
             x_outer:
                 for (int j = i; j < cur_y_boundary; j += CHUNK_SIZE ^^ 2)
                 {
                     int cur_z_boundary = z_boundary + j - first_unfilled;
+                    assert(cur_z_boundary < BLOCKS_IN_CHUNK + CHUNK_SIZE);
                     for (int k = j; k < cur_z_boundary; k += CHUNK_SIZE)
                     {
                         int cur_w_boundary = w_boundary + k - first_unfilled;
+                        assert(cur_w_boundary < BLOCKS_IN_CHUNK + 1);
                         for (int l = k; l < cur_w_boundary; l++) {
                             if (data.data[l] != data.data[first_unfilled]) {
                                 all_match = false;

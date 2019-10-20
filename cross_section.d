@@ -353,7 +353,89 @@ immutable Vec4[8][8] reference_cubes =
 
 
 
-// TODO edge_ordering can be halved in size using unsigned orientation
+int[8][256] gen_selected_edges() {
+    immutable reference_cube = reference_cubes[Vec4BasisSigned.NW];
+    immutable cube_perp = Vec4BasisSigned.NW.to_vec4();
+    int[8][256] selected_edges;
+
+    for (size_t pos_side_b = 0; pos_side_b < 256; pos_side_b++) {
+        bool[8] pos_side = void;
+        for (size_t j = 0; j < 8; j++) {
+            pos_side[j] = cast(bool)(pos_side_b & (1 << j));
+        }
+
+        static size_t[] intersecting_edges;
+        intersecting_edges.unsafe_reset();
+        static size_t[] intersection_point_idxs;
+        intersection_point_idxs.unsafe_reset();
+        foreach (j, t; reference_adjacent_corners) {
+            if (pos_side[t[0]] != pos_side[t[1]]) {
+                intersecting_edges ~= j;
+                intersection_point_idxs ~= intersection_point_idxs.length;
+            }
+        }
+
+        if (intersecting_edges.length < 3 || intersecting_edges.length > 6) {
+            selected_edges[pos_side_b] = -1;
+            continue;
+        }
+
+
+        Vec4 centroid = Vec4(0, 0, 0, 0);
+        static Vec4[] intersection_points;
+        intersection_points.unsafe_reset();
+        for (size_t j = 0; j < intersecting_edges.length; j++) {
+            auto cs = reference_adjacent_corners[intersecting_edges[j]];
+            intersection_points ~= (reference_cube[cs[0]] + reference_cube[cs[1]]) / 2;
+
+            centroid += intersection_points[j];
+        }
+        centroid = centroid / intersection_points.length;
+
+        assert(intersecting_edges.length == intersection_points.length);
+        assert(intersecting_edges.length == intersection_point_idxs.length);
+
+        const Vec4 plane_vec_a = (intersection_points[1] - intersection_points[0]).normalized();
+        const Vec4 plane_vec_b = (intersection_points[2] - intersection_points[0]).normalized();
+        const Vec4 normal = cross_p(cube_perp, plane_vec_a, plane_vec_b).normalized();
+
+        static float[] intersection_point_angles;
+        intersection_point_angles.unsafe_reset();
+        foreach (p; intersection_points) {
+            float t = dot_p(normal, cross_p(cube_perp, p - centroid, plane_vec_a));
+            float u = dot_p(normal, cross_p(cube_perp, p - centroid, plane_vec_b));
+            intersection_point_angles ~= atan2(u, t);
+        }
+
+        //sort!((a, b) => dot_p(normal, cross_p(cube_perp, intersection_points[a] - centroid, intersection_points[b] - centroid)) < 0)(intersection_point_idxs);
+        sort!((a, b) => intersection_point_angles[a] < intersection_point_angles[b])(intersection_point_idxs);
+
+        // write(idxs[i], " (", corner_dists[idxs[i]], "):\t");
+        // foreach (x; intersection_point_idxs) {
+        //     write(intersecting_edges[x], " (", intersection_point_angles[x], "), ");
+        // }
+
+        for (size_t j = 0; j < 8; j++) {
+            if (j < intersection_points.length) {
+                size_t idx = j % 2 == 0 ? intersection_point_idxs[j / 2] : intersection_point_idxs[intersection_points.length - 1 - (j / 2)];
+                selected_edges[pos_side_b][j] = cast(int)intersecting_edges[idx];
+                //write(intersecting_edges[idx], ", ");
+            } else {
+                selected_edges[pos_side_b][j] = -1;
+            }
+        }
+        writefln("%b %s", pos_side_b, selected_edges[pos_side_b][0..intersection_points.length]);
+    }
+
+    for (size_t pos_side_b = 0; pos_side_b < 0x100; pos_side_b++) {
+        assert(selected_edges[pos_side_b] == selected_edges[~pos_side_b & 0xff]);
+    }
+
+    return selected_edges;
+}
+
+
+
 void order_edges(ref int[6][8][8] edge_ordering, Vec4 normal) {
     for (size_t dir = 0; dir < 8; dir++) {
         immutable Vec4 cube_perp = from_basis(to!Vec4BasisSigned(dir));

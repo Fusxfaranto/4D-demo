@@ -40,6 +40,8 @@ struct CuboidShaderData {
     float *projection;
 
     int *edge_ordering;
+
+    int *selected_edges;
 }
 extern (C) extern __gshared CuboidShaderData cuboid_uniforms;
 extern (C) extern __gshared CuboidShaderData cuboid_uniforms_vertical;

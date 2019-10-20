@@ -115,6 +115,8 @@ void main()
 
     compass_projection = compass_projection_mat.data;
 
+    auto selected_edges = gen_selected_edges();
+
     int[6][8][8] edge_ordering;
     int[6][8][8] edge_ordering_vertical;
 
@@ -240,7 +242,7 @@ void main()
 
         float render_radius = 700;
         //load_chunks(char_pos, cast(int)(render_radius / CHUNK_SIZE) + 1, w.loaded_chunks);
-        w.load_chunks(char_pos, 7);
+        w.load_chunks(char_pos, 3);
 
         //scratch_strings ~= to!string(w.loaded_chunks.length);
         //scratch_strings ~= to!string(coords_to_chunkpos(char_pos));
@@ -314,6 +316,8 @@ void main()
                 cuboid_uniforms_vertical.projection = projection_mat.data();
 
                 cuboid_uniforms_vertical.edge_ordering = &edge_ordering_vertical[0][0][0];
+
+                cuboid_uniforms_vertical.selected_edges = &selected_edges[0][0];
             }
             generate_cross_section(w, &cuboid_data_vertical[0], vertical_objects, render_radius, cube_culling,
                                    char_pos, flat_normal, flat_front, global_up, flat_right);
@@ -337,6 +341,8 @@ void main()
                 cuboid_uniforms.projection = projection_mat.data();
 
                 cuboid_uniforms.edge_ordering = &edge_ordering[0][0][0];
+
+                cuboid_uniforms.selected_edges = &selected_edges[0][0];
             }
 
             //scratch_strings.length = 0;
