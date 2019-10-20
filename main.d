@@ -115,13 +115,13 @@ void main()
 
     compass_projection = compass_projection_mat.data;
 
-    auto selected_edges = gen_selected_edges();
-
-    int[6][8][8] edge_ordering;
-    int[6][8][8] edge_ordering_vertical;
-
     handle_errors!init();
     scope(exit) cleanup();
+
+    {
+        auto selected_edges = gen_selected_edges();
+        assign_static_cs_data(&selected_edges[0][0]);
+    }
 
     glfwSetKeyCallback(window, &key_callback);
     glfwSetMouseButtonCallback(window, &mouse_button_callback);
@@ -303,7 +303,6 @@ void main()
         {
         case DisplayMode.SPLIT:
         {
-            order_edges(edge_ordering_vertical, global_up);
             {
                 // TODO don't do these each frame
                 cuboid_uniforms_vertical.base_pos = char_pos.data();
@@ -314,10 +313,6 @@ void main()
 
                 cuboid_uniforms_vertical.view = view_mat.data();
                 cuboid_uniforms_vertical.projection = projection_mat.data();
-
-                cuboid_uniforms_vertical.edge_ordering = &edge_ordering_vertical[0][0][0];
-
-                cuboid_uniforms_vertical.selected_edges = &selected_edges[0][0];
             }
             generate_cross_section(w, &cuboid_data_vertical[0], vertical_objects, render_radius, cube_culling,
                                    char_pos, flat_normal, flat_front, global_up, flat_right);
@@ -328,7 +323,6 @@ void main()
 
         case DisplayMode.NORMAL:
         {
-            order_edges(edge_ordering, char_normal);
             {
                 // TODO don't do these each frame
                 cuboid_uniforms.base_pos = char_pos.data();
@@ -339,10 +333,6 @@ void main()
 
                 cuboid_uniforms.view = view_mat.data();
                 cuboid_uniforms.projection = projection_mat.data();
-
-                cuboid_uniforms.edge_ordering = &edge_ordering[0][0][0];
-
-                cuboid_uniforms.selected_edges = &selected_edges[0][0];
             }
 
             //scratch_strings.length = 0;

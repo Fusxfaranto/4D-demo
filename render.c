@@ -60,9 +60,6 @@ GLuint compass_fb;
 GLuint compass_tex;
 
 
-// TODO ???
-#define MAX_CUBES_IN_CHUNK (16 * 16 * 16 * 16 * 2)
-//#define MAX_CUBES_IN_CHUNK (4096)
 typedef struct ChunkGLData {
     GLuint VAO;
     GLuint VBO;
@@ -74,12 +71,12 @@ size_t chunk_data_pool_len;
 
 #define MAX_RENDERED_CHUNKS 8191
 GLuint cuboid_shader;
-GLuint cuboid_csdata_ubo;
-GLuint cuboid_vertical_csdata_ubo; // TODO probably will be redundant
+GLuint cuboid_static_csdata_ubo;
 ChunkGLData *cuboid_data[MAX_RENDERED_CHUNKS + 1];
 ChunkGLData *cuboid_data_vertical[MAX_RENDERED_CHUNKS + 1];
 
 typedef struct CuboidShaderData {
+// uniforms
     float *base_pos;
     float *normal;
     float *right;
@@ -88,10 +85,6 @@ typedef struct CuboidShaderData {
 
     float *view;
     float *projection;
-
-    int *edge_ordering;
-
-    int *selected_edges;
 } CuboidShaderData;
 CuboidShaderData cuboid_uniforms;
 CuboidShaderData cuboid_uniforms_vertical;
@@ -200,15 +193,6 @@ int init(void)
     view_loc = glGetUniformLocation(base_shader, "view");
     projection_loc = glGetUniformLocation(base_shader, "projection");
     compass_projection_location = glGetUniformLocation(compass_shader, "projection");
-
-
-    glGenBuffers(1, &cuboid_csdata_ubo);
-    glBindBuffer(GL_UNIFORM_BUFFER, cuboid_csdata_ubo);
-    // TODO size and usage
-    glBufferData(GL_UNIFORM_BUFFER, 256 * 8 * sizeof(int), NULL, GL_STREAM_DRAW);
-    glGenBuffers(1, &cuboid_vertical_csdata_ubo);
-    glBindBuffer(GL_UNIFORM_BUFFER, cuboid_vertical_csdata_ubo);
-    glBufferData(GL_UNIFORM_BUFFER, 256 * 8 * sizeof(int), NULL, GL_STREAM_DRAW);
 
     /* int width, height; */
     /* unsigned char* image = SOIL_load_image("cake.png", &width, &height, 0, SOIL_LOAD_RGB); */
@@ -395,6 +379,14 @@ int window_size_update(void)
 }
 
 
+void assign_static_cs_data(int* selected_edges) {
+    glGenBuffers(1, &cuboid_static_csdata_ubo);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 2, cuboid_static_csdata_ubo);
+    glBindBuffer(GL_UNIFORM_BUFFER, cuboid_static_csdata_ubo);
+    glBufferData(GL_UNIFORM_BUFFER, 0x80 * 8 * sizeof(int), selected_edges, GL_STATIC_DRAW);
+}
+
+
 void render_objects(FloatDArray os, GLuint VAO, GLuint VBO)
 {
     assert(os.l % 6 == 0);
@@ -479,7 +471,7 @@ void assign_chunk_gl_data(ChunkGLData **data_p, float* cube_corners, int cube_co
 }
 
 
-void render_cuboids(/*const*/ ChunkGLData **data, const CuboidShaderData* uniforms, GLuint csdata_ubo) {
+void render_cuboids(/*const*/ ChunkGLData **data, const CuboidShaderData* uniforms) {
     assert(data);
     assert(uniforms);
 
@@ -509,25 +501,6 @@ void render_cuboids(/*const*/ ChunkGLData **data, const CuboidShaderData* unifor
     loc = glGetUniformLocation(cuboid_shader, "projection");
     //assert(loc == 6);
     glUniformMatrix4fv(loc, 1, GL_FALSE, uniforms->projection);
-
-#if 0
-    //while (glGetError() != GL_NO_ERROR) {}
-    loc = glGetUniformLocation(cuboid_shader, "edge_ordering[0][0]");
-    //printf(" %d %d %d\n", loc, glGetError(), uniforms->edge_ordering[0]);
-    //assert(loc == 7);
-    //assert(loc != -1);
-    if (loc != -1) {
-        // TODO surely there's a better way??
-        for (size_t i = 0; i < 8 * 8 * 6; i++) {
-            glUniform1i(loc + i, uniforms->edge_ordering[i]);
-        }
-    }
-#else
-    // TODO literally only need to do this once
-    glBindBufferBase(GL_UNIFORM_BUFFER, 2, csdata_ubo);
-    glBindBuffer(GL_UNIFORM_BUFFER, csdata_ubo);
-    glBufferSubData(GL_UNIFORM_BUFFER, 0, 256 * 8 * sizeof(int), uniforms->selected_edges);
-#endif
 
     for (GLsizei i = 0; data[i] != NULL; i++) {
         //printf("rendering %d\n", i);
@@ -603,7 +576,7 @@ void render(void)
         glBindFramebuffer(GL_FRAMEBUFFER, main_fb);
         glClearColor(150.0 / 255.0, 127.0 / 255.0, 96.0 / 255.0, 1.0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        render_cuboids(cuboid_data, &cuboid_uniforms, cuboid_csdata_ubo);
+        render_cuboids(cuboid_data, &cuboid_uniforms);
 
 
         switch (display_mode)
@@ -617,7 +590,7 @@ void render(void)
             glBindFramebuffer(GL_FRAMEBUFFER, vertical_fb);
             glClearColor(130.0 / 255.0, 167.0 / 255.0, 90.0 / 255.0, 1.0);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            render_cuboids(cuboid_data_vertical, &cuboid_uniforms_vertical, cuboid_vertical_csdata_ubo);
+            render_cuboids(cuboid_data_vertical, &cuboid_uniforms_vertical);
             break;
 
         default:

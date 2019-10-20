@@ -22,8 +22,8 @@ layout(location = 5) uniform mat4 view;
 layout(location = 6) uniform mat4 projection;
 
 
-layout (std140, binding = 2) uniform CrossSectionData {
-    ivec4[256][2] selected_edges;
+layout (std140, binding = 2) uniform StaticCrossSectionData {
+    ivec4[0x80][2] selected_edges;
 };
 
 
@@ -165,31 +165,18 @@ void main()
     //bool[8] pos_side;
     int pos_side_b = 0;
 
-    float closest_neg_dist = -1e20;
-    int closest = -1;
-    int any_nonnegative = 0;
-
-    //float orientation_factor = positive_orientation ? 1 : -1;
     for (int i = 0; i < 8; i++) {
         rel_pos[i] = rel_corner * corner_offsets[unsigned_orientation][i] + rel_pos_v;
         //pos_side[i] = dot(rel_pos[i], normal) > 0;
         pos_side_b += int(dot(rel_pos[i], normal) > 0) << i;
-        float signed_dist = dot(rel_pos[i], normal);
-        any_nonnegative |= int(signed_dist >= 0);
-
-        if (signed_dist < 0 && signed_dist > closest_neg_dist) {
-            closest = i;
-            closest_neg_dist = signed_dist;
-        }
     }
 
-    // NO
-    // if ((pos_side_b & 0x80) == 0) {
-    //     pos_side_b = ~pos_side_b & 0xff;
-    // }
-    // pos_side_b = ~pos_side_b & 0xff;
+    if ((pos_side_b & 0x80) != 0) {
+        pos_side_b = ~pos_side_b & 0xff;
+    }
 
-    if (pos_side_b >= 256) {
+    // TODO
+    if (pos_side_b >= 0x80) {
         draw_debug_rectangle(vec4(1, 1, 1, 1), 0);
 
         EndPrimitive();

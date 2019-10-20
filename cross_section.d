@@ -353,12 +353,12 @@ immutable Vec4[8][8] reference_cubes =
 
 
 
-int[8][256] gen_selected_edges() {
+int[8][0x80] gen_selected_edges() {
     immutable reference_cube = reference_cubes[Vec4BasisSigned.NW];
     immutable cube_perp = Vec4BasisSigned.NW.to_vec4();
-    int[8][256] selected_edges;
+    int[8][0x100] selected_edges;
 
-    for (size_t pos_side_b = 0; pos_side_b < 256; pos_side_b++) {
+    for (size_t pos_side_b = 0; pos_side_b < 0x100; pos_side_b++) {
         bool[8] pos_side = void;
         for (size_t j = 0; j < 8; j++) {
             pos_side[j] = cast(bool)(pos_side_b & (1 << j));
@@ -424,134 +424,14 @@ int[8][256] gen_selected_edges() {
                 selected_edges[pos_side_b][j] = -1;
             }
         }
-        writefln("%b %s", pos_side_b, selected_edges[pos_side_b][0..intersection_points.length]);
+        //writefln("%b %s", pos_side_b, selected_edges[pos_side_b][0..intersection_points.length]);
     }
 
     for (size_t pos_side_b = 0; pos_side_b < 0x100; pos_side_b++) {
         assert(selected_edges[pos_side_b] == selected_edges[~pos_side_b & 0xff]);
     }
 
-    return selected_edges;
+    return selected_edges[0..0x80];
 }
 
 
-
-void order_edges(ref int[6][8][8] edge_ordering, Vec4 normal) {
-    for (size_t dir = 0; dir < 8; dir++) {
-        immutable Vec4 cube_perp = from_basis(to!Vec4BasisSigned(dir));
-
-        // TODO test
-        // if (to!Vec4BasisSigned(dir) != Vec4BasisSigned.X) {
-        //     for (size_t i = 0; i < 8; i++) {
-        //         for (size_t j = 0; j < 6; j++) {
-        //             edge_ordering[dir][i][j] = -1;
-        //         }
-        //     }
-        //     continue;
-        // }
-
-        // writeln(normal);
-        // writeln(front);
-        // writeln(right);
-
-        Vec4 plane_vec_a = arbitrary_perp_vec(cube_perp, normal);
-        Vec4 plane_vec_b = cross_p(cube_perp, normal, plane_vec_a);
-
-        Vec4[8] projected_corners = void;
-        size_t[8] idxs = void;
-        float[8] corner_dists = void;
-
-        foreach (i, v; reference_cubes[dir]) {
-            idxs[i] = i;
-            projected_corners[i] = proj(v, normal);
-            corner_dists[i] = dot_p(v, normal);
-            assert(abs(dot_p(projected_corners[i], normal) - corner_dists[i]) < 1e-5);
-            //writeln(corner_dists[i], '\t', projected_corners[i]);
-        }
-
-        sort!((a, b) => corner_dists[a] < corner_dists[b])(idxs[]);
-
-        static size_t[] copy_to;
-        copy_to.unsafe_reset();
-
-        for (size_t i = 0; i < 7; i++) {
-            float dist = distance(projected_corners[idxs[i]], projected_corners[idxs[i + 1]]);
-            // TODO threshold
-            if (dist < 1e-6) {
-                copy_to ~= i;
-                //writeln("skipping ", idxs[i], " (", dist, ")");
-                continue;
-            }
-            Vec4 midpoint = 0.5 * (projected_corners[idxs[i]] + projected_corners[idxs[i + 1]]);
-
-            Vec4[8] rel_pos = void;
-            bool[8] pos_side = void;
-            for (size_t j = 0; j < 8; j++) {
-                rel_pos[j] = reference_cubes[dir][j] - midpoint;
-                pos_side[j] = dot_p(rel_pos[j], normal) > 0;
-            }
-
-            Vec4 centroid = Vec4(0, 0, 0, 0);
-            static size_t[] intersecting_edges;
-            intersecting_edges.unsafe_reset();
-            static Vec4[] intersection_points;
-            intersection_points.unsafe_reset();
-            static size_t[] intersection_point_idxs;
-            intersection_point_idxs.unsafe_reset();
-            foreach (j, t; reference_adjacent_corners) {
-                if (pos_side[t[0]] != pos_side[t[1]]) {
-                    intersecting_edges ~= j;
-                    intersection_point_idxs ~= intersection_point_idxs.length;
-
-                    Vec4 diff = rel_pos[t[0]] - rel_pos[t[1]];
-                    float d = dot_p(normal, diff);
-                    intersection_points ~= rel_pos[t[0]] + diff * (-dot_p(rel_pos[t[0]], normal) / d);
-
-                    centroid += intersection_points[$-1];
-                }
-            }
-            centroid = centroid / intersection_points.length;
-
-            assert(intersecting_edges.length == intersection_points.length);
-            assert(intersecting_edges.length == intersection_point_idxs.length);
-
-            if (intersecting_edges.length == 0) {
-                continue; // TODO ??? is this ok
-            }
-
-            static float[] intersection_point_angles;
-            intersection_point_angles.unsafe_reset();
-            foreach (p; intersection_points) {
-                float t = dot_p(normal, cross_p(cube_perp, p - centroid, plane_vec_a));
-                float u = dot_p(normal, cross_p(cube_perp, p - centroid, plane_vec_b));
-                intersection_point_angles ~= atan2(u, t);
-            }
-
-            //sort!((a, b) => dot_p(normal, cross_p(cube_perp, intersection_points[a] - centroid, intersection_points[b] - centroid)) < 0)(intersection_point_idxs);
-            sort!((a, b) => intersection_point_angles[a] < intersection_point_angles[b])(intersection_point_idxs);
-
-            // write(idxs[i], " (", corner_dists[idxs[i]], "):\t");
-            // foreach (x; intersection_point_idxs) {
-            //     write(intersecting_edges[x], " (", intersection_point_angles[x], "), ");
-            // }
-            // TODO this fires sometimes, but i think it's probably just a precision issue with is_coplanar
-            //assert(is_coplanar!(1e-4)(intersection_points));
-
-            for (size_t j = 0; j < 6; j++) {
-                if (j < intersection_points.length) {
-                    size_t idx = j % 2 == 0 ? intersection_point_idxs[j / 2] : intersection_point_idxs[intersection_points.length - 1 - (j / 2)];
-                    edge_ordering[dir][idxs[i]][j] = cast(int)intersecting_edges[idx];
-                    //write(intersecting_edges[idx], ", ");
-                } else {
-                    edge_ordering[dir][idxs[i]][j] = -1; // TODO ??
-                }
-            }
-            //writeln();
-        }
-
-        foreach_reverse (i; copy_to) {
-            //writeln("copied ", idxs[i + 1], " to ", idxs[i]);
-            edge_ordering[dir][idxs[i]] = edge_ordering[dir][idxs[i + 1]];
-        }
-    }
-}

@@ -30,6 +30,7 @@ extern (C) void assign_chunk_gl_data(ChunkGLData**, float*, int);
 extern (C) void free_chunk_gl_data(ChunkGLData*);
 
 struct CuboidShaderData {
+// uniforms
     float *base_pos;
     float *normal;
     float *right;
@@ -38,13 +39,11 @@ struct CuboidShaderData {
 
     float *view;
     float *projection;
-
-    int *edge_ordering;
-
-    int *selected_edges;
 }
 extern (C) extern __gshared CuboidShaderData cuboid_uniforms;
 extern (C) extern __gshared CuboidShaderData cuboid_uniforms_vertical;
+
+extern (C) void assign_static_cs_data(int*);
 
 enum MAX_TEXTS = 16;
 
