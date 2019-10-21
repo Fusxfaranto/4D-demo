@@ -8,9 +8,8 @@ in VertexData {
     vec4 rel_corner;
 } vertex_data[];
 
-out flat vec4 cuboid_pos;
-out vec3 tex_coords;
-out flat int id;
+out vec4 blended_pos;
+out flat int signed_orientation_f;
 
 layout(location = 0) uniform vec4 base_pos;
 layout(location = 1) uniform vec4 normal;
@@ -175,14 +174,6 @@ void main()
         pos_side_b = ~pos_side_b & 0xff;
     }
 
-    // TODO
-    if (pos_side_b >= 0x80) {
-        draw_debug_rectangle(vec4(1, 1, 1, 1), 0);
-
-        EndPrimitive();
-        return;
-    }
-
 
     for (int i = 0; i < 6; i++) {
         int edge = selected_edges[pos_side_b][int(i > 3)][i & 3];
@@ -206,9 +197,11 @@ void main()
 
         gl_Position = projection * view * untransformed_vtx;
         //tex_coords = mix(local_corners[corner_a], local_corners[corner_b], scale / length(diff));
-        tex_coords = local_corners[corner_a] + scale * (local_corners[corner_a] - local_corners[corner_b]);
-        id = signed_orientation;
-        cuboid_pos = gl_in[0].gl_Position;
+        //tex_coords = local_corners[corner_a] + scale * (local_corners[corner_a] - local_corners[corner_b]);
+        blended_pos = rel_pos[corner_a] + scale * (rel_pos[corner_a] - rel_pos[corner_b]) + base_pos;
+        signed_orientation_f = signed_orientation;
+        //cuboid_pos = gl_in[0].gl_Position;
+        //rel_corner_pos = rel_corner;
         EmitVertex();
     }
 

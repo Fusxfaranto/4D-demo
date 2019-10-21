@@ -1,8 +1,7 @@
 #version 430 core
 
-in flat vec4 cuboid_pos;
-in vec3 tex_coords;
-in flat int id;
+in vec4 blended_pos;
+in flat int signed_orientation_f;
 
 out vec4 color;
 
@@ -74,69 +73,141 @@ const vec3[] colors_alt = {
     vec3(0.42, 0.16, 0.09)
 };
 
+
+const vec4[4][8] corner_offsets = {
+    {
+        vec4(0, 0, 0, 0),
+        vec4(0, 1, 0, 0),
+        vec4(0, 0, 1, 0),
+        vec4(0, 0, 0, 1),
+        vec4(0, 1, 1, 0),
+        vec4(0, 1, 0, 1),
+        vec4(0, 0, 1, 1),
+        vec4(0, 1, 1, 1)
+    },
+    {
+        vec4(0, 0, 0, 0),
+        vec4(1, 0, 0, 0),
+        vec4(0, 0, 1, 0),
+        vec4(0, 0, 0, 1),
+        vec4(1, 0, 1, 0),
+        vec4(1, 0, 0, 1),
+        vec4(0, 0, 1, 1),
+        vec4(1, 0, 1, 1)
+    },
+    {
+        vec4(0, 0, 0, 0),
+        vec4(1, 0, 0, 0),
+        vec4(0, 1, 0, 0),
+        vec4(0, 0, 0, 1),
+        vec4(1, 1, 0, 0),
+        vec4(1, 0, 0, 1),
+        vec4(0, 1, 0, 1),
+        vec4(1, 1, 0, 1)
+    },
+    {
+        vec4(0, 0, 0, 0),
+        vec4(1, 0, 0, 0),
+        vec4(0, 1, 0, 0),
+        vec4(0, 0, 1, 0),
+        vec4(1, 1, 0, 0),
+        vec4(1, 0, 1, 0),
+        vec4(0, 1, 1, 0),
+        vec4(1, 1, 1, 0)
+    }
+};
+
+const vec3[8] local_corners = {
+    vec3(0, 0, 0),
+    vec3(1, 0, 0),
+    vec3(0, 1, 0),
+    vec3(0, 0, 1),
+    vec3(1, 1, 0),
+    vec3(1, 0, 1),
+    vec3(0, 1, 1),
+    vec3(1, 1, 1)
+};
+
+#define UINT_MAX 0xffffffffu
+
 #define PI 3.1415926535897932384626433832795
 
+#if 0
 // https://stackoverflow.com/questions/4200224/random-noise-functions-for-glsl
 float rand(vec4 seed) {
     return fract(sin(dot(seed, vec4(12.9898, 78.233, 381.9813, 937.1512))) * 43758.5453);
 }
 
+#else
+uint urand(uint a) {
+    a = (a ^ 61) ^ (a >> 16);
+    a = a + (a << 3);
+    a = a ^ (a >> 4);
+    a = a * 0x27d4eb2d;
+    a = a ^ (a >> 15);
+    return a;
+}
+
+uint urand4(uvec4 seed, uint a) {
+    a = urand(seed.x ^ a);
+    a = urand(seed.y ^ a);
+    a = urand(seed.z ^ a);
+    a = urand(seed.w ^ a);
+    return a;
+}
+
+vec3 urand_to_rand3(uvec3 a) {
+    return a / float(UINT_MAX);
+}
+
+float urand_to_rand(uint a) {
+    return a / float(UINT_MAX);
+}
+
+float rand4(uvec4 seed, uint a) {
+    return urand_to_rand(urand4(seed, a));
+}
+#endif
+
+
 void main()
 {
-    //color = vec4(color_f, 1.0);
+    int unsigned_orientation = signed_orientation_f & 3;
+    bool positive_orientation = signed_orientation_f > 3;
 
-    vec4 sub_cube_pos = cuboid_pos;
+    //ivec3 sub_cube_offset;
+    //vec3 local_tex_coords = modf(rescaled_tex_coords, sub_cube_offset);
+
+    vec4 sub_cube_pos = floor(blended_pos);
+
+    vec4 local_tex_coords = blended_pos - sub_cube_pos;
+
+    // TODO there's almost certainly a better way to deal with these boundary issues
+    vec4 adjusted_pos = blended_pos + vec4(1e-5);
 
     if (true) {
-        const uvec4 seeds = uvec4(
-            267840417,
-            2412019164,
-            3434269503,
-            354219804
+        vec3 c = colors[signed_orientation_f];
+        uint r1 = urand4(
+            // uvec4(local_tex_coords * 8),
+            // urand4(uvec4(ivec4(sub_cube_pos)), 0)
+            uvec4(ivec4(floor(adjusted_pos * 8))), 861706333u
             );
-        // const uvec3 seeds = uvec3(
-        //     0,
-        //     0,
-        //     0
-        //     );
-
-        const uvec4 factors = uvec4(
-            62549,
-            75689,
-            27073,
-            51407
-            );
-
-        uvec4 v1 = ((uvec4(tex_coords * 8, 0) + uvec4(1, 1, 1, 1)) * factors) ^ seeds;
-
-        //uvec4 v1 = uvec4(0, 0, 0, 0);
-        uvec4 v2 = ((uvec4(abs(sub_cube_pos))) * factors) ^ seeds;
-        uvec4 v = v2;//1 ^ v2;
-
-        //uvec3 r = (1103515245 * v + 12345) & 0x7fffffff;
-
-        v = ((v & 0xffff) << 16) | ((v >> 16) & 0xffff);
-
-        uint r = v.x ^ v.y ^ v.z ^ v.w;
-        //vec3 c = colors_alt[r % colors_alt.length];
-        vec3 c = colors[id];
-        float a = ((float((r >> 16) & 255) - 127) / 255.) * 0.1;
-        //float a = (rand(vec4(floor(tex_coords * 8), 0)) - 0.5) * 0.4;
-        //a *= (rand(cuboid_pos) - 0.5);
+        uint r2 = urand(r1);
+        uint r3 = urand(r2);
         color = vec4(
             clamp(
-                c + a * vec3(1, 1, 1),
+                c + urand_to_rand3(uvec3(r1, r2, r3)) * 0.1,
                 vec3(0, 0, 0),
                 vec3(1, 1, 1)
                 ),
             1.0);
     } else {
         vec3 f = vec3(
-            sin(tex_coords.x * 5 * PI),
-            sin(tex_coords.y * 5 * PI + PI / 3),
-            sin(tex_coords.z * 5 * PI + 2 * PI / 3)
+            sin(blended_pos.x * 5 * PI),
+            sin(blended_pos.y * 5 * PI + PI / 3),
+            sin(blended_pos.z * 5 * PI + 2 * PI / 3)
             ) * 0.3 + 0.6;
 
-        color = vec4(mix(colors[id], colors[id + 8], length(f)), 1.0);
+        color = vec4(mix(colors[signed_orientation_f], colors[signed_orientation_f + 8], length(f)), 1.0);
     }
 }
