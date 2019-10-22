@@ -135,6 +135,8 @@ void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[
         }
     }
 
+    *gl_data_p++ = null;
+
     //writeln(processed_cps);
     foreach (cp; processed_cps)
     {

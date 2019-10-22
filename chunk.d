@@ -197,6 +197,11 @@ struct Chunk
     ChunkDataState state;
     ChunkProcessingStatus processing_status;
 
+    void transition_state(ChunkDataState s) {
+        writefln("transitioning %s -> %s", state, s);
+        state = s;
+    }
+
     void allocate_data() {
         final switch (state) {
         case ChunkDataState.INVALID:
@@ -212,7 +217,32 @@ struct Chunk
 
         // TODO sparse
         data = new ChunkData;
-        state = ChunkDataState.LOADED;
+        transition_state(ChunkDataState.LOADED);
+    }
+
+    void unload_data(ChunkDataState S)() {
+        static assert(S == ChunkDataState.OCCLUDED_UNLOADED || S == ChunkDataState.EMPTY);
+
+        final switch (state) {
+        case ChunkDataState.INVALID:
+        case ChunkDataState.OCCLUDED_UNLOADED:
+        case ChunkDataState.EMPTY:
+            assert(0);
+
+        case ChunkDataState.LOADED:
+            break;
+        }
+
+        assert(data !is null);
+
+        if (gl_data !is null) {
+            free_chunk_gl_data(gl_data);
+            gl_data = null;
+        }
+        // TODO return to a pool
+        data = null;
+
+        transition_state(S);
     }
 
     void update_from_internal() {
@@ -230,61 +260,51 @@ struct Chunk
 
         assert(data);
 
+        bool empty = true;
+
         // TODO this is naive and can probably be an order faster
         occludes_side = 0xff;
         for (size_t x = 0; x < CHUNK_SIZE; x++) {
             for (size_t y = 0; y < CHUNK_SIZE; y++) {
                 for (size_t z = 0; z < CHUNK_SIZE; z++) {
                     for (size_t w = 0; w < CHUNK_SIZE; w++) {
-                        if (x == 0 && is_transparent(data.grid[x][y][z][w])) {
-                            occludes_side &= ~(1 << 4);
-                        }
-                        if (y == 0 && is_transparent(data.grid[x][y][z][w])) {
-                            occludes_side &= ~(1 << 5);
-                        }
-                        if (z == 0 && is_transparent(data.grid[x][y][z][w])) {
-                            occludes_side &= ~(1 << 6);
-                        }
-                        if (w == 0 && is_transparent(data.grid[x][y][z][w])) {
-                            occludes_side &= ~(1 << 7);
-                        }
-                        if (x == CHUNK_SIZE - 1 && is_transparent(data.grid[x][y][z][w])) {
-                            occludes_side &= ~(1 << 0);
-                        }
-                        if (y == CHUNK_SIZE - 1 && is_transparent(data.grid[x][y][z][w])) {
-                            occludes_side &= ~(1 << 1);
-                        }
-                        if (z == CHUNK_SIZE - 1 && is_transparent(data.grid[x][y][z][w])) {
-                            occludes_side &= ~(1 << 2);
-                        }
-                        if (w == CHUNK_SIZE - 1 && is_transparent(data.grid[x][y][z][w])) {
-                            occludes_side &= ~(1 << 3);
+                        if (is_transparent(data.grid[x][y][z][w])) {
+                            if (x == 0) {
+                                occludes_side &= ~(1 << 4);
+                            }
+                            if (y == 0) {
+                                occludes_side &= ~(1 << 5);
+                            }
+                            if (z == 0) {
+                                occludes_side &= ~(1 << 6);
+                            }
+                            if (w == 0) {
+                                occludes_side &= ~(1 << 7);
+                            }
+                            if (x == CHUNK_SIZE - 1) {
+                                occludes_side &= ~(1 << 0);
+                            }
+                            if (y == CHUNK_SIZE - 1) {
+                                occludes_side &= ~(1 << 1);
+                            }
+                            if (z == CHUNK_SIZE - 1) {
+                                occludes_side &= ~(1 << 2);
+                            }
+                            if (w == CHUNK_SIZE - 1) {
+                                occludes_side &= ~(1 << 3);
+                            }
+                        } else {
+                            empty = false;
                         }
                     }
                 }
             }
         }
+
+        if (empty) {
+            unload_data!(ChunkDataState.EMPTY)();
+        }
     }
-
-    /*
-      enum W_SPAN(int N) = 2 ^^ N;
-      enum Z_SPAN(int N) = (2 ^^ N) * CHUNK_SIZE;
-      enum Y_SPAN(int N) = (2 ^^ N) * (CHUNK_SIZE ^^ 2);
-
-      for (size_t x = 0; x < 2 ^^ N; x++, b += CHUNK_SIZE ^^ 3 - Y_SPAN!N)
-      {
-      for (size_t y = 0; y < 2 ^^ N; y++, b += CHUNK_SIZE ^^ 2 - Z_SPAN!N)
-      {
-      for (size_t z = 0; z < 2 ^^ N; z++, b += CHUNK_SIZE - W_SPAN!N)
-      {
-      for (size_t w = 0; w < 2 ^^ N; w++, b++)
-      {
-
-      }
-      }
-      }
-      }
-    */
 
     void update_from_surroundings(ChunkPos loc, const ref Chunk[ChunkPos] chunks) {
         final switch (state) {
@@ -322,13 +342,7 @@ struct Chunk
         }
 
         if (occluded_from == 0xff) {
-            state = ChunkDataState.OCCLUDED_UNLOADED;
-            if (gl_data !is null) {
-                free_chunk_gl_data(gl_data);
-                gl_data = null;
-            }
-            // TODO return to a pool
-            data = null;
+            unload_data!(ChunkDataState.OCCLUDED_UNLOADED)();
         } else {
             update_gl_data(loc);
         }
@@ -336,7 +350,7 @@ struct Chunk
 
     private void update_gl_data(ChunkPos loc) {
         assert(data, format("%s %s", loc, state));
-        writeln("updating ", loc);
+        //writeln("updating ", loc);
 
         enum BlockState : ubyte {
             EMPTY,
@@ -617,167 +631,9 @@ struct Chunk
         }
 
         assign_chunk_gl_data(&gl_data, vert_data.ptr, cast(int)(vert_data.length));
-/+
-
-        // TODO uhh not this
-        // lol dmd doesn't inline this
-        void process_block(Vec4 CORNER)(size_t x, size_t y, size_t z, size_t w) {
-            Vec4 block_pos = Vec4(x, y, z, w) + loc.to_vec4();
-
-            void process_cube(Vec4 pos, Vec4BasisSigned dir) {
-                vert_data ~= pos.x;
-                vert_data ~= pos.y;
-                vert_data ~= pos.z;
-                vert_data ~= pos.w;
-
-                Vec4 rel_corner;
-                final switch (dir)
-                {
-                case Vec4BasisSigned.NX:
-                    enum V = ewise_p(Vec4(0, 1, 1, 1), CORNER);
-                    rel_corner = V;
-                    break;
-
-                case Vec4BasisSigned.NY:
-                    rel_corner = ewise_p(Vec4(1, 0, 1, 1), CORNER);
-                    break;
-
-                case Vec4BasisSigned.NZ:
-                    rel_corner = ewise_p(Vec4(1, 1, 0, 1), CORNER);
-                    break;
-
-                case Vec4BasisSigned.NW:
-                    rel_corner = ewise_p(Vec4(1, 1, 1, 0), CORNER);
-                    break;
-
-                case Vec4BasisSigned.X:
-                    rel_corner = ewise_p(Vec4(0, -1, -1, -1), CORNER);
-                    break;
-
-                case Vec4BasisSigned.Y:
-                    rel_corner = ewise_p(Vec4(-1, 0, -1, -1), CORNER);
-                    break;
-
-                case Vec4BasisSigned.Z:
-                    rel_corner = ewise_p(Vec4(-1, -1, 0, -1), CORNER);
-                    break;
-
-                case Vec4BasisSigned.W:
-                    rel_corner = ewise_p(Vec4(-1, -1, -1, 0), CORNER);
-                    break;
-                }
-
-                vert_data ~= rel_corner.x;
-                vert_data ~= rel_corner.y;
-                vert_data ~= rel_corner.z;
-                vert_data ~= rel_corner.w;
-            }
-
-            if (x == 0 || x == CHUNK_SIZE - 1 || b[-(CHUNK_SIZE ^^ 3)] == BlockType.NONE)
-            {
-                process_cube(block_pos, Vec4BasisSigned.NX);
-            }
-            if (y == 0 || y == CHUNK_SIZE - 1 || b[-(CHUNK_SIZE ^^ 2)] == BlockType.NONE)
-            {
-                process_cube(block_pos, Vec4BasisSigned.NY);
-            }
-            if (z == 0 || z == CHUNK_SIZE - 1 || b[-(CHUNK_SIZE ^^ 1)] == BlockType.NONE)
-            {
-                process_cube(block_pos, Vec4BasisSigned.NZ);
-            }
-            if (w == 0 || w == CHUNK_SIZE - 1 || b[-(CHUNK_SIZE ^^ 0)] == BlockType.NONE)
-            {
-                process_cube(block_pos, Vec4BasisSigned.NW);
-            }
-
-            block_pos += CORNER;
-
-            if (x == 0 || x == CHUNK_SIZE - 1 || b[CHUNK_SIZE ^^ 3] == BlockType.NONE)
-            {
-                process_cube(block_pos, Vec4BasisSigned.X);
-            }
-            if (y == 0 || y == CHUNK_SIZE - 1 || b[CHUNK_SIZE ^^ 2] == BlockType.NONE)
-            {
-                process_cube(block_pos, Vec4BasisSigned.Y);
-            }
-            if (z == 0 || z == CHUNK_SIZE - 1 || b[CHUNK_SIZE ^^ 1] == BlockType.NONE)
-            {
-                process_cube(block_pos, Vec4BasisSigned.Z);
-            }
-            if (w == 0 || w == CHUNK_SIZE - 1 || b[CHUNK_SIZE ^^ 0] == BlockType.NONE)
-            {
-                process_cube(block_pos, Vec4BasisSigned.W);
-            }
-        }
-
-
-        bool none_empty = true;
-
-    outer:
-        for (size_t x = 0; x < CHUNK_SIZE; x++)
-        {
-            for (size_t y = 0; y < CHUNK_SIZE; y++)
-            {
-                for (size_t z = 0; z < CHUNK_SIZE; z++)
-                {
-                    for (size_t w = 0; w < CHUNK_SIZE; w++)
-                    {
-                        if (data.grid[x][y][z][w] == BlockType.NONE)
-                        {
-                            none_empty = false;
-                            break outer;
-                        }
-                    }
-                }
-            }
-        }
-
-        // lol
-        if (none_empty) {
-            process_block!(Vec4(CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE, CHUNK_SIZE))(0, 0, 0, 0);
-        } else {
-            for (size_t x = 0; x < CHUNK_SIZE; x++)
-            {
-                for (size_t y = 0; y < CHUNK_SIZE; y++)
-                {
-                    for (size_t z = 0; z < CHUNK_SIZE; z++)
-                    {
-                        for (size_t w = 0; w < CHUNK_SIZE; w++, b++)
-                        {
-                            if (*b != BlockType.NONE)
-                            {
-                                process_block!(Vec4(1, 1, 1, 1))(x, y, z, w);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        //assert(vert_data.length > 0);
-        writeln(vert_data.ptr);
-        writefln("%s\twriting %s", loc, vert_data.length);
-        assign_chunk_gl_data(&gl_data, vert_data.ptr, cast(int)(vert_data.length));
-        +/
     }
 }
 
-
-
-// Vec4 chunk_idx_to_vec4(size_t idx)
-// {
-//     return Vec4(
-//         idx / (CHUNK_SIZE ^^ 3),
-//         (idx / (CHUNK_SIZE ^^ 2)) % CHUNK_SIZE,
-//         (idx / CHUNK_SIZE) % CHUNK_SIZE,
-//         idx % CHUNK_SIZE,
-//         );
-// }
-
-// float chunkpos_dist(ChunkPos a, ChunkPos b)
-// {
-//     return sqrt(to!real((a.x - b.x) ^^ 2 + (a.y - b.y) ^^ 2 + (a.z - b.z) ^^ 2 + (a.w - b.w) ^^ 2));
-// }
 
 int chunkpos_l1_dist(ChunkPos a, ChunkPos b)
 {
@@ -822,41 +678,3 @@ Chunk gen_fixed_chunk()
 
     return c;
 }
-
-Chunk fetch_chunk(ChunkPos loc)
-{
-    static Chunk* fixed_chunk = null;
-
-    Chunk c;
-
-    if (
-        //true
-        //loc == ChunkPos(-1, -1, -1, 0)
-        loc.y < 0
-        //loc.y == -1
-        //loc == ChunkPos(0, 0, 0, 0)
-        //loc == ChunkPos(1, 0, 1, 0)
-        )
-    {
-        if (false){
-            if (!fixed_chunk)
-            {
-                fixed_chunk = new Chunk();
-                *fixed_chunk = gen_fixed_chunk();
-            }
-
-            c = *fixed_chunk;
-        } else {
-            c = gen_fixed_chunk();
-        }
-    } else {
-        c.state = ChunkDataState.EMPTY;
-    }
-
-    //c.update_gl_data(loc);
-
-    c.update_from_internal();
-
-    return c;
-}
-

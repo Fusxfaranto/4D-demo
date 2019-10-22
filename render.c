@@ -460,7 +460,7 @@ void assign_chunk_gl_data(ChunkGLData **data_p, float* cube_corners, int cube_co
         glBindBuffer(GL_ARRAY_BUFFER, data->VBO);
     }
     
-    printf("%p\twrote %d\n", (void*)data, cube_corners_len);
+    //printf("%p\twrote %d\n", (void*)data, cube_corners_len);
 
     glBufferSubData(GL_ARRAY_BUFFER, 0, cube_corners_len * sizeof(float), cube_corners);
     data->len = cube_corners_len / 8;

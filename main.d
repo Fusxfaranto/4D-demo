@@ -242,7 +242,7 @@ void main()
 
         float render_radius = 700;
         //load_chunks(char_pos, cast(int)(render_radius / CHUNK_SIZE) + 1, w.loaded_chunks);
-        w.load_chunks(char_pos, 4);
+        w.load_chunks(char_pos, 2);
 
         //scratch_strings ~= to!string(w.loaded_chunks.length);
         //scratch_strings ~= to!string(coords_to_chunkpos(char_pos));

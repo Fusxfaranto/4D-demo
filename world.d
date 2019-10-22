@@ -54,6 +54,27 @@ struct World
     }
 
 
+    Chunk fetch_chunk(ChunkPos loc)
+    {
+        Chunk c;
+
+        //c.update_gl_data(loc);
+
+        c.data = new ChunkData;
+        c.state = ChunkDataState.LOADED;
+
+        if (loc == ChunkPos(0, 0, 0, 0)) {
+            c.data.data[0] = BlockType.TEST;
+        }
+
+        c.update_from_internal();
+
+        writeln(c.state);
+
+        return c;
+    }
+
+
     // TODO this need some general rethinking
     void load_chunks(Vec4 center, int radius)
     {
