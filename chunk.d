@@ -110,12 +110,12 @@ float distance(T)(auto ref in T a, auto ref in T b) if (is(T : IPos!Np, size_t N
 }
 
 
-
 // TODO something better
 T to_ipos(T : IPos!N, size_t N)(Vec4BasisSigned b) pure {
     return T(b.to_vec4());
 }
 
+alias BlockPos = IPos!1;
 alias ChunkPos = IPos!CHUNK_SIZE;
 
 
@@ -225,9 +225,11 @@ struct Chunk
 
         final switch (state) {
         case ChunkDataState.INVALID:
-        case ChunkDataState.OCCLUDED_UNLOADED:
         case ChunkDataState.EMPTY:
-            assert(0);
+            assert(0, format("%s", state));
+
+        case ChunkDataState.OCCLUDED_UNLOADED:
+            return;
 
         case ChunkDataState.LOADED:
             break;
@@ -638,43 +640,4 @@ struct Chunk
 int chunkpos_l1_dist(ChunkPos a, ChunkPos b)
 {
     return abs(a.x - b.x) + abs(a.y - b.y) + abs(a.z - b.z) + abs(a.w - b.w);
-}
-
-
-Chunk gen_fixed_chunk()
-{
-    Chunk c;
-    c.data = new ChunkData;
-    c.state = ChunkDataState.LOADED;
-    BlockType* b = c.data.begin();
-    foreach (x; 0..CHUNK_SIZE)
-    {
-        foreach (y; 0..CHUNK_SIZE)
-        {
-            foreach (z; 0..CHUNK_SIZE)
-            {
-                for (size_t w = 0; w < CHUNK_SIZE; w++, b++)
-                {
-                    enum n = 11;
-                    //if (w == x && w == y && w == z)
-                    //if (x < 8 && y < 8 && z < 8 && w < 8)
-                    //if (x < n && y < n && z < n && w < n)
-                    //if ((b - c.data.begin()) % 1755 == 0)
-                    //if ((b - c.data.begin()) % 255 == 0)
-                    //if ((b - c.data.begin()) % 49 == 0)
-                    //if ((b - c.data.begin()) % 37 == 8)
-                    //if (w == x && w == y && w == z && w == 0)
-                    //if (x == 0 && y == 0 && z == 0 && w == 0)
-                    //if (x < 5 && x % 2 == 0 && w == y && w == z && w == 0)
-                    //if ((x != 0) + (y != 0) + (z != 0) + (w != 0) <= 1)
-                    //if (y >= CHUNK_SIZE - 4)
-                    {
-                        *b = BlockType.TEST;
-                    }
-                }
-            }
-        }
-    }
-
-    return c;
 }

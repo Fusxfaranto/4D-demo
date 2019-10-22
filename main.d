@@ -2,7 +2,7 @@
 import std.stdio : writeln;
 import std.conv : to;
 import std.math : PI, sin, cos, acos, sgn, abs;
-import std.datetime : TickDuration;
+import std.datetime : to, TickDuration;
 import std.datetime.stopwatch : StopWatch;
 import std.array : array;
 import std.algorithm : sum, map;
@@ -130,6 +130,7 @@ void main()
     int last_width = -1, last_height = -1;
     //float last_fov = fov;
     TickDuration last_time;
+    TickDuration extra_time;
     float[30] fpss;
     debug(prof) sw.start();
 
@@ -140,7 +141,7 @@ void main()
 
         fpss[t % fpss.length] = 1.0e9 / (TickDuration.currSystemTick() - last_time).nsecs();
         float fps = sum(fpss[]) / fpss.length;
-        title_str = fps.to!string() ~ '\0';
+        title_str = format("%s %s\0", fps.to!string(), extra_time.to!("usecs", long));
         last_time = TickDuration.currSystemTick();
 
         process_input();
@@ -242,7 +243,7 @@ void main()
 
         float render_radius = 700;
         //load_chunks(char_pos, cast(int)(render_radius / CHUNK_SIZE) + 1, w.loaded_chunks);
-        w.load_chunks(char_pos, 2);
+        w.load_chunks(char_pos, 4);
 
         //scratch_strings ~= to!string(w.loaded_chunks.length);
         //scratch_strings ~= to!string(coords_to_chunkpos(char_pos));
@@ -358,7 +359,13 @@ void main()
             }
         }
 
-        wait_for_next_frame();
+        {
+            StopWatch extra_time_sw;
+            extra_time_sw.start();
+            wait_for_next_frame();
+            extra_time = extra_time_sw.peek().to!TickDuration();
+
+        }
         debug(prof) profile_checkpoint();
 
         t++;

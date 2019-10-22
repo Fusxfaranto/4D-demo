@@ -1,13 +1,11 @@
+import std.algorithm : min;
 
 import util;
 import matrix;
 import shapes;
 import chunk;
 import cross_section;
-
-
-
-alias BlockPos = IPos!1;
+import world_gen;
 
 
 struct BlockFace {
@@ -63,8 +61,22 @@ struct World
         c.data = new ChunkData;
         c.state = ChunkDataState.LOADED;
 
-        if (loc == ChunkPos(0, 0, 0, 0)) {
-            c.data.data[0] = BlockType.TEST;
+        //if (false)
+        {
+            Vec4 base_p = loc.to_vec4() + Vec4(0.5, 0.5, 0.5, 0.5);
+            foreach (x; 0..CHUNK_SIZE) {
+                foreach (z; 0..CHUNK_SIZE) {
+                    foreach (w; 0..CHUNK_SIZE) {
+                        Vec4 p = base_p + Vec4(x, 0, z, w);
+                        double f = perlin3(p * 0.1);
+                        float height = f * 20;
+                        int max_y = min(cast(int)(height - p.y), CHUNK_SIZE);
+                        for (int y = 0; y < max_y; y++) {
+                            c.data.grid[x][y][z][w] = BlockType.TEST;
+                        }
+                    }
+                }
+            }
         }
 
         c.update_from_internal();

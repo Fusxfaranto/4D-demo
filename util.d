@@ -95,3 +95,8 @@ void unsafe_assign(alias init, T)(ref T[] a) {
         a[i] = init[i];
     }
 }
+
+
+T reinterpret(T, U)(auto ref U u) if (T.sizeof) {
+    return *cast(T*)(&u);
+}
