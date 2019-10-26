@@ -721,7 +721,7 @@ void process_input()
         //writefln("%f %f", xpos, ypos);
 
 
-        if (get_key(GLFWKey.GLFW_KEY_LEFT_ALT) == GLFWKeyStatus.GLFW_PRESS) {
+        if (get_key(GLFWKey.GLFW_KEY_LEFT_ALT) == GLFWKeyStatus.GLFW_PRESS || get_key(GLFWKey.GLFW_KEY_LEFT) == GLFWKeyStatus.GLFW_PRESS) {
             if (xpos != 0) {
                 Mat4 r = rot!false(global_up, char_normal, xpos * mouse_speed);
                 char_front = (r * char_front).normalized();

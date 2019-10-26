@@ -20,18 +20,20 @@ OBJS := $(C_OBJS) $(D_OBJS)
 #DC := ldc2
 DC := dmd
 
-CFLAGS := -m64 -g -c -O3 -std=c11 -pedantic -Wall -Werror -Wno-error=unused-variable #-I/usr/include/freetype2/ #-Iftgl/src/
+CFLAGS := -m64 -g -c -O3 -std=c11 -pedantic -Wall -Werror -Wno-error=unused-variable -Iinclude #-I/usr/include/freetype2/ #-Iftgl/src/
 DFLAGS := -m64 -g -c -O
 #DFLAGS += -d-debug=prof
 #DFLAGS += -profile=gc -debug=prof
 #LDFLAGS := -Llib -lm -lSOIL -lGLEW -lglfw -lGL
 
-LDFLAGS := -L-Llib
-LDFLAGS += -L-lm
-LDFLAGS += -L-lSOIL
-LDFLAGS += -L-lGLEW
-LDFLAGS += -L-lglfw
-LDFLAGS += -L-lGL
+LDFLAGS := -L=-Llib
+LDFLAGS += -L=-lm
+LDFLAGS += -L=-lSOIL
+LDFLAGS += -L=-lglfw
+LDFLAGS += -L=-lGL
+LDFLAGS += -L=-lGLEW
+#LDFLAGS := -L=-rpath=lib
+#LDFLAGS += -L=-l:libGLEW.so
 
 .PHONY: all clean distclean
 
@@ -39,7 +41,7 @@ all: $(NAME)
 
 $(NAME): $(OBJS)
 #	$(DC) $(OBJS) $(LDFLAGS) -o $(NAME)
-	$(DC) $(OBJS) $(LDFLAGS) -of$(NAME)
+	$(DC) -L=-rpath=lib $(OBJS) $(LDFLAGS) -of$(NAME)
 
 $(D_OBJS): $(D_SRCS)
 	$(DC) $(D_SRCS) $(DFLAGS)

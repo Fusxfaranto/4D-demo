@@ -139,6 +139,15 @@ float rand(vec4 seed) {
 }
 
 #else
+// TODO very visible patterns when using this
+uint xorshift(uint a)
+{
+    a ^= a << 13;
+    a ^= a >> 17;
+    a ^= a << 5;
+    return a;
+}
+
 uint urand(uint a) {
     a = (a ^ 61) ^ (a >> 16);
     a = a + (a << 3);
@@ -192,8 +201,8 @@ void main()
             // urand4(uvec4(ivec4(sub_cube_pos)), 0)
             uvec4(ivec4(floor(adjusted_pos * 8))), 861706333u
             );
-        uint r2 = urand(r1);
-        uint r3 = urand(r2);
+        uint r2 = r1;//urand(r1);
+        uint r3 = r1;//urand(r2);
         color = vec4(
             clamp(
                 c + urand_to_rand3(uvec3(r1, r2, r3)) * 0.1,

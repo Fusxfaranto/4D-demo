@@ -1,4 +1,5 @@
 import std.algorithm : min;
+import std.range : back, empty;
 
 import util;
 import matrix;
@@ -62,14 +63,15 @@ struct World
         c.state = ChunkDataState.LOADED;
 
         //if (false)
+        // TODO cache the shit out of these
         {
             Vec4 base_p = loc.to_vec4() + Vec4(0.5, 0.5, 0.5, 0.5);
             foreach (x; 0..CHUNK_SIZE) {
                 foreach (z; 0..CHUNK_SIZE) {
                     foreach (w; 0..CHUNK_SIZE) {
                         Vec4 p = base_p + Vec4(x, 0, z, w);
-                        double f = perlin3(p * 0.1);
-                        float height = f * 20;
+                        double f = perlin3(p * 0.03);
+                        float height = f * 40;
                         int max_y = min(cast(int)(height - p.y), CHUNK_SIZE);
                         for (int y = 0; y < max_y; y++) {
                             c.data.grid[x][y][z][w] = BlockType.TEST;
