@@ -65,14 +65,24 @@ struct World
         //if (false)
         // TODO cache the shit out of these
         {
+            static immutable OctaveInfo[] ois = [
+                {0.2,  5},
+                {0.1,  10},
+                {0.03,  30},
+                {0.002, 150},
+                {0.0005, 400},
+                {0.00007, 1500},
+                ];
             Vec4 base_p = loc.to_vec4() + Vec4(0.5, 0.5, 0.5, 0.5);
+            Vec4 base_p_height = base_p;
+            base_p_height.y = 0;
             foreach (x; 0..CHUNK_SIZE) {
                 foreach (z; 0..CHUNK_SIZE) {
                     foreach (w; 0..CHUNK_SIZE) {
-                        Vec4 p = base_p + Vec4(x, 0, z, w);
-                        double f = perlin3(p * 0.03);
-                        float height = f * 40;
-                        int max_y = min(cast(int)(height - p.y), CHUNK_SIZE);
+                        Vec4 p = base_p_height + Vec4(x, 0, z, w);
+                        double f = octaves!memo_perlin3(p, ois);
+                        float height = f - 30;
+                        int max_y = min(cast(int)(height - base_p.y), CHUNK_SIZE);
                         for (int y = 0; y < max_y; y++) {
                             c.data.grid[x][y][z][w] = BlockType.TEST;
                         }
