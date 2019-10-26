@@ -203,6 +203,7 @@ void main()
             );
         uint r2 = r1;//urand(r1);
         uint r3 = r1;//urand(r2);
+        //vec3 c = signed_orientation_f == 1 ? colors[1] : colors_alt[urand(r3) % colors_alt.length()];
         color = vec4(
             clamp(
                 c + urand_to_rand3(uvec3(r1, r2, r3)) * 0.1,

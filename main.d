@@ -11,6 +11,7 @@ import std.typecons : Tuple, tuple;
 import util;
 import render_bindings;
 import matrix;
+import movement;
 import shapes;
 import chunk;
 import cross_section;
@@ -27,11 +28,12 @@ Vec3 camera_pos = Vec3(0, 0, 3);
 // Vec3 camera_up = Vec3(0, 1, 0);
 float fov;
 
-Vec4 char_pos = Vec4(0, 0.4, 0, 0.5);
-Vec4 char_front = Vec4(0, 0.3, 1, 0).normalized();
-Vec4 char_up = Vec4(0, 1, -0.3, 0).normalized();
-Vec4 char_normal = Vec4(0, 0, 0, 1);
-enum Vec4 global_up = Vec4(0, 1, 0, 0);
+PosDir pd = PosDir(
+    Vec4(0, 0.4, 0, 0.5),
+    Vec4(0, 0.3, 1, 0).normalized(),
+    Vec4(0, 1, -0.3, 0).normalized(),
+    Vec4(0, 0, 0, 1),
+    );
 
 Mat4 view_mat, projection_mat, compass_projection_mat;
 
@@ -145,6 +147,8 @@ void main()
         last_time = TickDuration.currSystemTick();
 
         process_input();
+        pd.fixup();
+
         debug(prof) profile_checkpoint();
 
         if (force_window_size_update || last_width != width || last_height != height)
@@ -173,9 +177,8 @@ void main()
         }
         debug(prof) profile_checkpoint();
 
-        Vec4 char_right = cross_p(char_up, char_front, char_normal);
-
         //test_rot_mat = rot(test_plane[0], test_plane[1], test_angle);
+        Vec4 char_right = pd.right();
 
         screen_text_data[0].x = -1;
         screen_text_data[0].y = 1;
@@ -203,34 +206,34 @@ void main()
         case TextDisplay.POS:
             screen_text_data[1].a = [
                 format("front:    %6.3f, %6.3f, %6.3f, %6.3f (%6.3f)\0",
-                       char_front.x, char_front.y, char_front.z, char_front.w, char_front.magnitude()).ptr,
+                       pd.front.x, pd.front.y, pd.front.z, pd.front.w, pd.front.magnitude()).ptr,
                 format("up:       %6.3f, %6.3f, %6.3f, %6.3f (%6.3f)\0",
-                       char_up.x, char_up.y, char_up.z, char_up.w, char_up.magnitude()).ptr,
+                       pd.up.x, pd.up.y, pd.up.z, pd.up.w, pd.up.magnitude()).ptr,
                 format("right:    %6.3f, %6.3f, %6.3f, %6.3f (%6.3f)\0",
                        char_right.x, char_right.y, char_right.z, char_right.w, char_right.magnitude()).ptr,
                 format("normal:   %6.3f, %6.3f, %6.3f, %6.3f (%6.3f)\0",
-                       char_normal.x, char_normal.y, char_normal.z, char_normal.w, char_normal.magnitude()).ptr,
+                       pd.normal.x, pd.normal.y, pd.normal.z, pd.normal.w, pd.normal.magnitude()).ptr,
                 format("position: %6.3f, %6.3f, %6.3f, %6.3f (%6.3f)\0",
-                       char_pos.x, char_pos.y, char_pos.z, char_pos.w, char_pos.magnitude()).ptr,
+                       pd.pos.x, pd.pos.y, pd.pos.z, pd.pos.w, pd.pos.magnitude()).ptr,
                 ];
             break;
         }
         scratch_strings.unsafe_reset();
         debug(prof) profile_checkpoint();
 
-        Vec4 flat_front = (char_front - proj(char_front, global_up)).normalized();
-        Vec4 flat_normal = (char_normal - proj(char_normal, global_up)).normalized();
-        Vec4 flat_right = cross_p(global_up, flat_front, flat_normal);
+        Vec4 flat_front = (pd.front - proj(pd.front, GLOBAL_UP)).normalized();
+        Vec4 flat_normal = (pd.normal - proj(pd.normal, GLOBAL_UP)).normalized();
+        Vec4 flat_right = cross_p(GLOBAL_UP, flat_front, flat_normal);
 
         if (char_enabled)
         {
             Mat4 r = Mat4(
                 flat_right.x, flat_right.y, flat_right.z, flat_right.w,
-                global_up.x, global_up.y, global_up.z, global_up.w,
+                GLOBAL_UP.x, GLOBAL_UP.y, GLOBAL_UP.z, GLOBAL_UP.w,
                 flat_front.x, flat_front.y, flat_front.z, flat_front.w,
                 flat_normal.x, flat_normal.y, flat_normal.z, flat_normal.w,
                 );
-            w.character = tesseract!true(char_pos, 0.6 * Vec4(0.3, 0.8, 0.3, 0.3), r);
+            w.character = tesseract!true(pd.pos, 0.6 * Vec4(0.3, 0.8, 0.3, 0.3), r);
         }
         else
         {
@@ -242,14 +245,14 @@ void main()
         debug(prof) profile_checkpoint();
 
         float render_radius = 700;
-        //load_chunks(char_pos, cast(int)(render_radius / CHUNK_SIZE) + 1, w.loaded_chunks);
-        w.load_chunks(char_pos, 40 / CHUNK_SIZE);
+        //load_chunks(pd.pos, cast(int)(render_radius / CHUNK_SIZE) + 1, w.loaded_chunks);
+        w.load_chunks(pd.pos, 40 / CHUNK_SIZE);
 
         //scratch_strings ~= to!string(w.loaded_chunks.length);
-        //scratch_strings ~= to!string(coords_to_chunkpos(char_pos));
+        //scratch_strings ~= to!string(coords_to_chunkpos(pd.pos));
         {
-            // TODO i don't really get why char_front is "backwards" like this
-            targeted_block = w.target_nonempty(char_pos, -1 * char_front);
+            // TODO i don't really get why pd.front is "backwards" like this
+            targeted_block = w.target_nonempty(pd.pos, -1 * pd.front);
             //BlockPos b = w.target_nonempty(Vec4(1, 2, 3, 4), Vec4(0, -1, 0, 0));
             if (targeted_block != BlockFace.INVALID) {
                 scratch_strings ~= to!string(targeted_block);
@@ -306,8 +309,8 @@ void main()
         {
             {
                 // TODO don't do these each frame
-                cuboid_uniforms_vertical.base_pos = char_pos.data();
-                cuboid_uniforms_vertical.normal = global_up.data();
+                cuboid_uniforms_vertical.base_pos = pd.pos.data();
+                cuboid_uniforms_vertical.normal = GLOBAL_UP.data();
                 cuboid_uniforms_vertical.right = flat_right.data();
                 cuboid_uniforms_vertical.up = flat_normal.data();
                 cuboid_uniforms_vertical.front = flat_front.data();
@@ -316,7 +319,7 @@ void main()
                 cuboid_uniforms_vertical.projection = projection_mat.data();
             }
             generate_cross_section(w, &cuboid_data_vertical[0], vertical_objects, render_radius, cube_culling,
-                                   char_pos, flat_normal, flat_front, global_up, flat_right);
+                                   pd.pos, flat_normal, flat_front, GLOBAL_UP, flat_right);
             debug(prof) profile_checkpoint();
             goto case DisplayMode.NORMAL;
 
@@ -326,11 +329,11 @@ void main()
         {
             {
                 // TODO don't do these each frame
-                cuboid_uniforms.base_pos = char_pos.data();
-                cuboid_uniforms.normal = char_normal.data();
+                cuboid_uniforms.base_pos = pd.pos.data();
+                cuboid_uniforms.normal = pd.normal.data();
                 cuboid_uniforms.right = char_right.data();
-                cuboid_uniforms.up = char_up.data();
-                cuboid_uniforms.front = char_front.data();
+                cuboid_uniforms.up = pd.up.data();
+                cuboid_uniforms.front = pd.front.data();
 
                 cuboid_uniforms.view = view_mat.data();
                 cuboid_uniforms.projection = projection_mat.data();
@@ -338,7 +341,7 @@ void main()
 
             //scratch_strings.length = 0;
             generate_cross_section(w, &cuboid_data[0], objects, render_radius, cube_culling,
-                          char_pos, char_up, char_front, char_normal, char_right);
+                                   pd.pos, pd.up, pd.front, pd.normal, char_right);
             debug(prof) profile_checkpoint();
         }
         }
@@ -416,17 +419,17 @@ extern (C) void key_callback(GLFWwindow* window, int key, int scancode, int acti
     {
     case GLFWKey.GLFW_KEY_SPACE:
     {
-        writeln("front: ", char_front);
-        writeln("up: ", char_up);
-        writeln("normal: ", char_normal);
-        writeln("right: ", cross_p(char_up, char_front, char_normal));
-        writeln("position: ", char_pos);
+        writeln("front: ", pd.front);
+        writeln("up: ", pd.up);
+        writeln("normal: ", pd.normal);
+        writeln("right: ", pd.right());
+        writeln("position: ", pd.pos);
 
-        writeln(dot_p(char_normal, char_up));
-        writeln(dot_p(char_front, char_up));
-        writeln(dot_p(char_front, char_normal));
+        writeln(dot_p(pd.normal, pd.up));
+        writeln(dot_p(pd.front, pd.up));
+        writeln(dot_p(pd.front, pd.normal));
 
-        Vec4 flat_front = char_front - proj(char_front, global_up);
+        Vec4 flat_front = pd.front - proj(pd.front, GLOBAL_UP);
         writeln(flat_front);
         writeln(acos(dot_p(Vec4(1, 0, 0, 0), flat_front)
                      / flat_front.magnitude()) * 180 / PI);
@@ -501,10 +504,10 @@ extern (C) void key_callback(GLFWwindow* window, int key, int scancode, int acti
     case GLFWKey.GLFW_KEY_1:
     {
         char_enabled = true;
-        char_pos = Vec4(0, 0.7, 0, 0.5);
-        char_front = Vec4(0, 0.3, 1, 0).normalized();
-        char_up = Vec4(0, 1, -0.3, 0).normalized();
-        char_normal = Vec4(0, 0, 0, 1);
+        pd.pos = Vec4(0, 0.7, 0, 0.5);
+        pd.front = Vec4(0, 0.3, 1, 0).normalized();
+        pd.up = Vec4(0, 1, -0.3, 0).normalized();
+        pd.normal = Vec4(0, 0, 0, 1);
         camera_pos.z = 3;
         view_mat = look_at(camera_pos, Vec3(0, 0, 0), Vec3(0, 1, 0));
         break;
@@ -512,26 +515,26 @@ extern (C) void key_callback(GLFWwindow* window, int key, int scancode, int acti
 
     case GLFWKey.GLFW_KEY_2:
     {
-        char_pos = Vec4(0, .7, 0, 0);
-        char_front = Vec4(-.01, 0, 1, 0).normalized();
-        char_up = Vec4(0, 1, 0, 0);
-        char_normal = Vec4(0, 0, 0, 1);
+        pd.pos = Vec4(0, .7, 0, 0);
+        pd.front = Vec4(-.01, 0, 1, 0).normalized();
+        pd.up = Vec4(0, 1, 0, 0);
+        pd.normal = Vec4(0, 0, 0, 1);
         break;
     }
 
     case GLFWKey.GLFW_KEY_3:
     {
-        char_front = Vec4(0, 0, -1, 1).normalized();
-        char_up = Vec4(0, 1, 0, 0).normalized();
-        char_normal = Vec4(1, 0, -1, -1).normalized();
+        pd.front = Vec4(0, 0, -1, 1).normalized();
+        pd.up = Vec4(0, 1, 0, 0).normalized();
+        pd.normal = Vec4(1, 0, -1, -1).normalized();
         break;
     }
 
     case GLFWKey.GLFW_KEY_4:
     {
-        char_front = Vec4(0, 0, -1, 1).normalized();
-        char_up = Vec4(0, 1, 0, 0).normalized();
-        char_normal = Vec4(1, 0, 1, 1).normalized();
+        pd.front = Vec4(0, 0, -1, 1).normalized();
+        pd.up = Vec4(0, 1, 0, 0).normalized();
+        pd.normal = Vec4(1, 0, 1, 1).normalized();
         break;
     }
 
@@ -559,7 +562,6 @@ void process_input()
     float speed = 0.05;
     float rot_speed = 0.02;
     float other_rot_speed = rot_speed; // remove?
-    float y_limit = 0.99;
 
     if (get_key(GLFWKey.GLFW_KEY_LEFT_SHIFT) == GLFWKeyStatus.GLFW_PRESS)
     {
@@ -576,124 +578,70 @@ void process_input()
 
     if (get_key(GLFWKey.GLFW_KEY_W) == GLFWKeyStatus.GLFW_PRESS)
     {
-        char_pos -= speed * (char_front - proj(char_front, global_up)).normalized();
+        pd.move_flat!"front"(-speed);
     }
     if (get_key(GLFWKey.GLFW_KEY_S) == GLFWKeyStatus.GLFW_PRESS)
     {
-        char_pos += speed * (char_front - proj(char_front, global_up)).normalized();
+        pd.move_flat!"front"(speed);
     }
     if (get_key(GLFWKey.GLFW_KEY_R) == GLFWKeyStatus.GLFW_PRESS)
     {
-        char_pos += speed * global_up;
+        pd.move!"GLOBAL_UP"(speed);
     }
     if (get_key(GLFWKey.GLFW_KEY_F) == GLFWKeyStatus.GLFW_PRESS)
     {
-        char_pos -= speed * global_up;
+        pd.move!"GLOBAL_UP"(-speed);
     }
     if (get_key(GLFWKey.GLFW_KEY_Q) == GLFWKeyStatus.GLFW_PRESS)
     {
-        char_pos += speed * char_normal;
+        pd.move!"normal"(speed);
     }
     if (get_key(GLFWKey.GLFW_KEY_E) == GLFWKeyStatus.GLFW_PRESS)
     {
-        char_pos -= speed * char_normal;
+        pd.move!"normal"(-speed);
     }
     if (get_key(GLFWKey.GLFW_KEY_A) == GLFWKeyStatus.GLFW_PRESS)
     {
-        char_pos -= speed * normalized(cross_p(char_up, char_front, char_normal));
+        pd.move!"right()"(-speed);
     }
     if (get_key(GLFWKey.GLFW_KEY_D) == GLFWKeyStatus.GLFW_PRESS)
     {
-        char_pos += speed * normalized(cross_p(char_up, char_front, char_normal));
+        pd.move!"right()"(speed);
     }
 
 
     if (get_key(GLFWKey.GLFW_KEY_J) == GLFWKeyStatus.GLFW_PRESS)
     {
-        Mat4 r = rot!false(global_up, char_normal, /*char_normal.w.sgn() * */-rot_speed);
-        char_front = (r * char_front).normalized();
-        char_up = (r * char_up).normalized();
+        pd.rotate!("GLOBAL_UP", "normal")(-rot_speed);
     }
     if (get_key(GLFWKey.GLFW_KEY_L) == GLFWKeyStatus.GLFW_PRESS)
     {
-        Mat4 r = rot!false(global_up, char_normal, /*char_normal.w.sgn() **/ rot_speed);
-        char_front = (r * char_front).normalized();
-        char_up = (r * char_up).normalized();
+        pd.rotate!("GLOBAL_UP", "normal")(rot_speed);
     }
     if (get_key(GLFWKey.GLFW_KEY_U) == GLFWKeyStatus.GLFW_PRESS)
     {
-        //writeln(rot!false(char_up, char_front, -rot_speed));
-        // testo -= other_rot_speed;
-        // writeln(testo * 180 / PI);
-        Mat4 r = rot!false(global_up, cross_p(char_up, char_front, char_normal), -other_rot_speed);
-        char_front = (r * char_front).normalized();
-        char_normal = (r * char_normal).normalized();
-        char_up = (r * char_up).normalized();
-        //char_normal = (rot(char_normal, char_front, -other_rot_speed) * char_normal).normalized();
+        pd.rotate!("GLOBAL_UP", "right()")(-other_rot_speed);
     }
     if (get_key(GLFWKey.GLFW_KEY_O) == GLFWKeyStatus.GLFW_PRESS)
     {
-        //writeln(rot!false(char_up, char_front, rot_speed));
-        // testo += other_rot_speed;
-        // writeln(testo * 180 / PI);
-        Mat4 r = rot!false(global_up, cross_p(char_up, char_front, char_normal), other_rot_speed);
-        char_front = (r * char_front).normalized();
-        char_normal = (r * char_normal).normalized();
-        char_up = (r * char_up).normalized();
-        //char_normal = (rot(char_normal, char_front, other_rot_speed) * char_normal).normalized();
+        pd.rotate!("GLOBAL_UP", "right()")(other_rot_speed);
     }
     if (get_key(GLFWKey.GLFW_KEY_M) == GLFWKeyStatus.GLFW_PRESS)
     {
-        Mat4 r = rot!false(global_up, char_front, -other_rot_speed);
-        char_normal = (r * char_normal).normalized();
-        char_up = (r * char_up).normalized();
+        pd.rotate!("GLOBAL_UP", "front")(-other_rot_speed);
     }
     if (get_key(GLFWKey.GLFW_KEY_PERIOD) == GLFWKeyStatus.GLFW_PRESS)
     {
-        Mat4 r = rot!false(global_up, char_front, other_rot_speed);
-        char_normal = (r * char_normal).normalized();
-        char_up = (r * char_up).normalized();
+        pd.rotate!("GLOBAL_UP", "front")(other_rot_speed);
     }
     if (get_key(GLFWKey.GLFW_KEY_I) == GLFWKeyStatus.GLFW_PRESS)
     {
-        if (char_front.y > -y_limit)
-        {
-            Mat4 r = rot(char_up, char_front, rot_speed);
-            char_front = (r * char_front).normalized();
-            char_up = (r * char_up).normalized();
-        }
+        pd.y_rotate(rot_speed);
     }
     if (get_key(GLFWKey.GLFW_KEY_K) == GLFWKeyStatus.GLFW_PRESS)
     {
-        if (char_front.y < y_limit)
-        {
-            Mat4 r = rot(char_up, char_front, -rot_speed);
-            char_front = (r * char_front).normalized();
-            char_up = (r * char_up).normalized();
-        }
+        pd.y_rotate(-rot_speed);
     }
-    // if (get_key(GLFWKey.GLFW_KEY_Y) == GLFWKeyStatus.GLFW_PRESS)
-    // {
-    //     Mat4 r = rot!false(char_front, char_normal, -rot_speed);
-    //     char_up = (r * char_up).normalized();
-    // }
-    // if (get_key(GLFWKey.GLFW_KEY_H) == GLFWKeyStatus.GLFW_PRESS)
-    // {
-    //     Mat4 r = rot!false(char_front, char_normal, rot_speed);
-    //     char_up = (r * char_up).normalized();
-    // }
-    // if (get_key(GLFWKey.GLFW_KEY_P) == GLFWKeyStatus.GLFW_PRESS)
-    // {
-    //     Mat4 r = rot(char_up, char_normal, -rot_speed);
-    //     char_up = (r * char_up).normalized();
-    //     char_normal = (r * char_normal).normalized();
-    // }
-    // if (get_key(GLFWKey.GLFW_KEY_SEMICOLON) == GLFWKeyStatus.GLFW_PRESS)
-    // {
-    //     Mat4 r = rot(char_up, char_normal, rot_speed);
-    //     char_up = (r * char_up).normalized();
-    //     char_normal = (r * char_normal).normalized();
-    // }
 
     if (get_key(GLFWKey.GLFW_KEY_Z) == GLFWKeyStatus.GLFW_PRESS)
     {
@@ -723,57 +671,21 @@ void process_input()
 
         if (get_key(GLFWKey.GLFW_KEY_LEFT_ALT) == GLFWKeyStatus.GLFW_PRESS || get_key(GLFWKey.GLFW_KEY_LEFT) == GLFWKeyStatus.GLFW_PRESS) {
             if (xpos != 0) {
-                Mat4 r = rot!false(global_up, char_normal, xpos * mouse_speed);
-                char_front = (r * char_front).normalized();
-                char_up = (r * char_up).normalized();
+                pd.rotate!("GLOBAL_UP", "normal")(xpos * mouse_speed);
             }
             if (ypos != 0) {
-                Mat4 r = rot!false(global_up, cross_p(char_up, char_front, char_normal), ypos * mouse_speed);
-                char_front = (r * char_front).normalized();
-                char_normal = (r * char_normal).normalized();
-                char_up = (r * char_up).normalized();
+                pd.rotate!("GLOBAL_UP", "right()")(ypos * mouse_speed);
             }
         } else {
             if (xpos != 0) {
-                Mat4 r = rot!false(global_up, char_normal, xpos * mouse_speed);
-                char_front = (r * char_front).normalized();
-                char_up = (r * char_up).normalized();
+                pd.rotate!("GLOBAL_UP", "normal")(xpos * mouse_speed);
             }
             if (ypos != 0) {
-                if (
-                    (char_front.y > -y_limit && ypos < 0) ||
-                    (char_front.y < y_limit && ypos > 0)
-                    )
-                {
-                    Mat4 r = rot(char_up, char_front, -ypos * mouse_speed);
-                    char_front = (r * char_front).normalized();
-                    char_up = (r * char_up).normalized();
-                }
+                pd.y_rotate(-ypos * mouse_speed);
             }
         }
 
         glfwSetCursorPos(window, 0, 0);
-    }
-
-
-    // TODO: else if?
-    if (abs(dot_p(char_normal, char_up)) > 1e-7)
-    {
-        //writeln("normal/up offset");
-        Vec4 right = cross_p(char_up, char_front, char_normal);
-        char_normal = cross_p(char_up, right, char_front).normalized();
-    }
-    if (abs(dot_p(char_front, char_up)) > 1e-7)
-    {
-        //writeln("front/up offset");
-        Vec4 right = cross_p(char_up, char_front, char_normal);
-        char_front = cross_p(right, char_up, char_normal).normalized();
-    }
-    if (abs(dot_p(char_front, char_normal)) > 1e-7)
-    {
-        //writeln("front/normal offset");
-        Vec4 right = cross_p(char_up, char_front, char_normal);
-        char_front = cross_p(right, char_up, char_normal).normalized();
     }
 }
 

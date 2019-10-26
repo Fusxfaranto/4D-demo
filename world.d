@@ -64,12 +64,12 @@ struct World
         // TODO cache the shit out of these
         {
             static immutable OctaveInfo[] ois = [
-                {0.2,  5},
-                {0.1,  10},
+                //{0.2,  5},
+                //{0.1,  10},
                 {0.03,  30},
-                {0.002, 150},
-                {0.0005, 400},
-                {0.00007, 1500},
+                //{0.002, 150},
+                //{0.0005, 400},
+                //{0.00007, 1500},
                 ];
             Vec4 base_p = loc.to_vec4() + Vec4(0.5, 0.5, 0.5, 0.5);
             Vec4 base_p_height = base_p;
