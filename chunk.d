@@ -13,7 +13,7 @@ import util;
 
 
 
-enum CHUNK_SIZE = 2 ^^ 4;
+enum CHUNK_SIZE = 2 ^^ 3;
 enum BLOCKS_IN_CHUNK = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 
 
@@ -308,49 +308,7 @@ struct Chunk
         }
     }
 
-    void update_from_surroundings(ChunkPos loc, const ref Chunk[ChunkPos] chunks) {
-        final switch (state) {
-        case ChunkDataState.INVALID:
-            assert(0);
-
-        case ChunkDataState.LOADED:
-        case ChunkDataState.OCCLUDED_UNLOADED:
-            break;
-
-        case ChunkDataState.EMPTY:
-            return;
-        }
-
-        occluded_from = 0;
-        for (int i = 0; i < 8; i++)
-        {
-            ChunkPos adjacent_loc = void;
-            final switch (i) {
-            case 0: adjacent_loc = loc.shift!"x"(1); break;
-            case 1: adjacent_loc = loc.shift!"y"(1); break;
-            case 2: adjacent_loc = loc.shift!"z"(1); break;
-            case 3: adjacent_loc = loc.shift!"w"(1); break;
-            case 4: adjacent_loc = loc.shift!"x"(-1); break;
-            case 5: adjacent_loc = loc.shift!"y"(-1); break;
-            case 6: adjacent_loc = loc.shift!"z"(-1); break;
-            case 7: adjacent_loc = loc.shift!"w"(-1); break;
-            }
-
-            const Chunk* p = adjacent_loc in chunks;
-            int relative_side = (i + 4) & 0b111;
-            if (p is null || p.occludes_side & (1 << relative_side)) {
-                occluded_from |= 1 << i;
-            }
-        }
-
-        if (occluded_from == 0xff) {
-            unload_data!(ChunkDataState.OCCLUDED_UNLOADED)();
-        } else {
-            update_gl_data(loc);
-        }
-    }
-
-    private void update_gl_data(ChunkPos loc) {
+    void update_gl_data(ChunkPos loc) {
         assert(data, format("%s %s", loc, state));
         //writeln("updating ", loc);
 
@@ -539,13 +497,11 @@ struct Chunk
             int y_boundary = first_unfilled + (CHUNK_SIZE - y) * (CHUNK_SIZE ^^ 2);
             for (i = first_unfilled + CHUNK_SIZE ^^ 2; true; i += CHUNK_SIZE ^^ 2)
             {
-                //writefln("%d %d %d %d", first_unfilled, i, y_boundary, first_unfilled + (CHUNK_SIZE - y) * (CHUNK_SIZE ^^ 2));
                 if (i >= y_boundary) {
                     break;
                 }
 
                 int cur_z_boundary = z_boundary + i - first_unfilled;
-                //writefln("%s\t%s\t%s", ChunkData.get_coords(y_boundary), ChunkData.get_coords(cur_z_boundary), ChunkData.get_coords(i));
                 assert(cur_z_boundary < BLOCKS_IN_CHUNK + CHUNK_SIZE);
                 bool all_match = true;
             y_outer:

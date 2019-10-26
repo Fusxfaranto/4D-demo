@@ -106,12 +106,14 @@ void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[
             }
 
             Vec4 rel_center = new_cp.to_vec4_centered() - base_pos;
-            if (abs(dot_p(rel_center, normal)) > CHUNK_SIZE)
+            // radius of circumscribing 3-sphere
+            enum R = (CHUNK_SIZE * Vec4(1, 1, 1, 1)).magnitude() / 2;
+            if (abs(dot_p(rel_center, normal)) > R)
             {
                 continue;
             }
 
-            if (dot_p(rel_center, front) > CHUNK_SIZE)
+            if (dot_p(rel_center, front) > R)
             {
                 continue;
             }

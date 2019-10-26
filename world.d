@@ -30,7 +30,7 @@ struct World
         assert(c); // TODO
 
         c.update_from_internal();
-        c.update_from_surroundings(cp, loaded_chunks);
+        update_chunk_from_surroundings(cp);
         for (int i = 0; i < 8; i++)
         {
             ChunkPos adjacent_cp = void;
@@ -45,16 +45,14 @@ struct World
             case 7: adjacent_cp = cp.shift!"w"(-1); break;
             }
 
-            Chunk* p = adjacent_cp in loaded_chunks;
-            if (p) {
-                p.update_from_surroundings(adjacent_cp, loaded_chunks);
-            }
+            update_chunk_from_surroundings(adjacent_cp);
         }
     }
 
 
     Chunk fetch_chunk(ChunkPos loc)
     {
+        debug(prof) profile_checkpoint();
         Chunk c;
 
         //c.update_gl_data(loc);
@@ -96,6 +94,62 @@ struct World
         writeln(c.state);
 
         return c;
+    }
+
+
+    private void update_chunk_from_surroundings(ChunkPos loc) {
+        Chunk* c = loc in loaded_chunks;
+        if (c is null) {
+            return;
+        }
+
+        final switch (c.state) {
+        case ChunkDataState.INVALID:
+            assert(0);
+
+        case ChunkDataState.LOADED:
+        case ChunkDataState.OCCLUDED_UNLOADED:
+            break;
+
+        case ChunkDataState.EMPTY:
+            return;
+        }
+
+        c.occluded_from = 0;
+        for (int i = 0; i < 8; i++)
+        {
+            ChunkPos adjacent_loc = void;
+            final switch (i) {
+            case 0: adjacent_loc = loc.shift!"x"(1); break;
+            case 1: adjacent_loc = loc.shift!"y"(1); break;
+            case 2: adjacent_loc = loc.shift!"z"(1); break;
+            case 3: adjacent_loc = loc.shift!"w"(1); break;
+            case 4: adjacent_loc = loc.shift!"x"(-1); break;
+            case 5: adjacent_loc = loc.shift!"y"(-1); break;
+            case 6: adjacent_loc = loc.shift!"z"(-1); break;
+            case 7: adjacent_loc = loc.shift!"w"(-1); break;
+            }
+
+            const Chunk* p = adjacent_loc in loaded_chunks;
+            int relative_side = (i + 4) & 0b111;
+            // an unloaded chunk counts as completely occluding
+            if (p is null || p.occludes_side & (1 << relative_side)) {
+                c.occluded_from |= 1 << i;
+            }
+        }
+
+        if (c.occluded_from == 0xff) {
+            c.unload_data!(ChunkDataState.OCCLUDED_UNLOADED)();
+        } else {
+            // TODO something more graceful than this
+            if (c.data is null) {
+                assert(c.gl_data is null);
+                assert(c.state == ChunkDataState.OCCLUDED_UNLOADED);
+                *c = fetch_chunk(loc);
+            }
+
+            c.update_gl_data(loc);
+        }
     }
 
 
@@ -180,7 +234,7 @@ struct World
         // TODO i think this basically works but it overprocesses
         // should reuse processing_status?
         foreach (ref cp; newly_loaded) {
-            loaded_chunks[cp].update_from_surroundings(cp, loaded_chunks);
+            update_chunk_from_surroundings(cp);
 
             for (int i = 0; i < 8; i++)
             {
@@ -196,10 +250,7 @@ struct World
                 case 7: adjacent_cp = cp.shift!"w"(-1); break;
                 }
 
-                Chunk* p = adjacent_cp in loaded_chunks;
-                if (p) {
-                    p.update_from_surroundings(adjacent_cp, loaded_chunks);
-                }
+                update_chunk_from_surroundings(adjacent_cp);
             }
         }
     }
@@ -209,7 +260,12 @@ struct World
         ChunkPos cp = containing_chunkpos(p);
 
         Chunk* c = cp in loaded_chunks;
-        assert(c); // TODO
+        // TODO
+        if (c is null) {
+            load_chunks(cp.to_vec4_centered(), 1);
+            c = cp in loaded_chunks;
+        }
+        assert(c);
 
         BlockPos rel_p = p - cp;
         //writefln("%s %s %s", p, cp, rel_p);

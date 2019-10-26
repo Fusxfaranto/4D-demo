@@ -151,10 +151,10 @@ void main()
 
     vec4 rel_pos_v = pos - base_pos;
 
-    // TODO doesn't seem to be quite correct, also only very slightly faster?
-    if (false) {
-        vec4 rel_center = rel_pos_v + vec4(0.5, 0.5, 0.5, 0.5);
-        if (abs(dot(rel_center, normal)) > 1 || dot(rel_center, front) > 1) {
+    if (true) {
+        float r = 0.5 * length(rel_corner);
+        vec4 rel_center = rel_pos_v + 0.5 * rel_corner;
+        if (abs(dot(rel_center, normal)) > r || dot(rel_center, front) > r) {
             EndPrimitive();
             return;
         }
