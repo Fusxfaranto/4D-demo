@@ -1,7 +1,7 @@
 
 import std.stdio : writeln;
 import std.conv : to;
-import std.math : PI, sin, cos, acos, sgn, abs;
+import std.math : floor, PI, sin, cos, acos, sgn, abs;
 import std.datetime : to, TickDuration;
 import std.datetime.stopwatch : StopWatch;
 import std.array : array;
@@ -33,6 +33,7 @@ PosDir pd = PosDir(
     Vec4(0, 0.3, 1, 0).normalized(),
     Vec4(0, 1, -0.3, 0).normalized(),
     Vec4(0, 0, 0, 1),
+    Vec4(0, 0, 0, 0),
     );
 
 Mat4 view_mat, projection_mat, compass_projection_mat;
@@ -40,6 +41,9 @@ Mat4 view_mat, projection_mat, compass_projection_mat;
 bool char_enabled = false;
 bool force_window_size_update = true;
 bool cube_culling = true;
+
+
+bool gravity_on = true;
 
 
 enum TextDisplay
@@ -147,6 +151,9 @@ void main()
         last_time = TickDuration.currSystemTick();
 
         process_input();
+        if (gravity_on) {
+            pd.process_gravity(w);
+        }
         pd.fixup();
 
         debug(prof) profile_checkpoint();
@@ -246,7 +253,7 @@ void main()
 
         float render_radius = 700;
         //load_chunks(pd.pos, cast(int)(render_radius / CHUNK_SIZE) + 1, w.loaded_chunks);
-        w.load_chunks(pd.pos, 40 / CHUNK_SIZE);
+        w.load_chunks(pd.pos, 70 / CHUNK_SIZE);
 
         //scratch_strings ~= to!string(w.loaded_chunks.length);
         //scratch_strings ~= to!string(coords_to_chunkpos(pd.pos));
@@ -307,9 +314,37 @@ void main()
         {
         case DisplayMode.SPLIT:
         {
+            Vec4 vert_pos = pd.pos;
+            if (targeted_block != BlockFace.INVALID) {
+                int target_y = targeted_block.pos.y;
+                switch (targeted_block.face) {
+                case Vec4BasisSigned.Y:
+                    target_y += 1;
+                    break;
+                case Vec4BasisSigned.NY:
+                    target_y -= 1;
+                    break;
+                default:
+                    break;
+                }
+
+                // TODO this doesn't actually catch all occlusions
+                int inc = target_y > vert_pos.y ? 1 : -1;
+                int x = 0;
+                while (cast(int)(floor(vert_pos.y)) != target_y) {
+                    vert_pos.y += inc;
+                    if (!w.get_block(BlockPos(vert_pos)).is_transparent()) {
+                        vert_pos.y -= inc;
+                        break;
+                    }
+                    x++;
+                    // TODO lol
+                    assert(x < 500);
+                }
+            }
             {
                 // TODO don't do these each frame
-                cuboid_uniforms_vertical.base_pos = pd.pos.data();
+                cuboid_uniforms_vertical.base_pos = vert_pos.data();
                 cuboid_uniforms_vertical.normal = GLOBAL_UP.data();
                 cuboid_uniforms_vertical.right = flat_right.data();
                 cuboid_uniforms_vertical.up = flat_normal.data();
@@ -319,7 +354,7 @@ void main()
                 cuboid_uniforms_vertical.projection = projection_mat.data();
             }
             generate_cross_section(w, &cuboid_data_vertical[0], vertical_objects, render_radius, cube_culling,
-                                   pd.pos, flat_normal, flat_front, GLOBAL_UP, flat_right);
+                                   vert_pos, flat_normal, flat_front, GLOBAL_UP, flat_right);
             debug(prof) profile_checkpoint();
             goto case DisplayMode.NORMAL;
 
@@ -417,7 +452,13 @@ extern (C) void key_callback(GLFWwindow* window, int key, int scancode, int acti
 
     switch (key)
     {
-    case GLFWKey.GLFW_KEY_SPACE:
+    case GLFWKey.GLFW_KEY_SPACE: {
+        gravity_on = true;
+        pd.jump();
+        break;
+    }
+
+    case GLFWKey.GLFW_KEY_BACKSPACE:
     {
         writeln("front: ", pd.front);
         writeln("up: ", pd.up);
@@ -465,12 +506,6 @@ extern (C) void key_callback(GLFWwindow* window, int key, int scancode, int acti
         }
         assert(display_mode == display_mode.to!DisplayMode);
         force_window_size_update = true;
-        break;
-    }
-
-    case GLFWKey.GLFW_KEY_BACKSPACE:
-    {
-        char_enabled ^= true;
         break;
     }
 
@@ -578,35 +613,37 @@ void process_input()
 
     if (get_key(GLFWKey.GLFW_KEY_W) == GLFWKeyStatus.GLFW_PRESS)
     {
-        pd.move_flat!"front"(-speed);
+        pd.move_flat!"front"(-speed, w);
     }
     if (get_key(GLFWKey.GLFW_KEY_S) == GLFWKeyStatus.GLFW_PRESS)
     {
-        pd.move_flat!"front"(speed);
+        pd.move_flat!"front"(speed, w);
     }
     if (get_key(GLFWKey.GLFW_KEY_R) == GLFWKeyStatus.GLFW_PRESS)
     {
-        pd.move!"GLOBAL_UP"(speed);
+        gravity_on = false;
+        pd.move!"GLOBAL_UP"(speed, w);
     }
     if (get_key(GLFWKey.GLFW_KEY_F) == GLFWKeyStatus.GLFW_PRESS)
     {
-        pd.move!"GLOBAL_UP"(-speed);
+        gravity_on = false;
+        pd.move!"GLOBAL_UP"(-speed, w);
     }
     if (get_key(GLFWKey.GLFW_KEY_Q) == GLFWKeyStatus.GLFW_PRESS)
     {
-        pd.move!"normal"(speed);
+        pd.move!"normal"(speed, w);
     }
     if (get_key(GLFWKey.GLFW_KEY_E) == GLFWKeyStatus.GLFW_PRESS)
     {
-        pd.move!"normal"(-speed);
+        pd.move!"normal"(-speed, w);
     }
     if (get_key(GLFWKey.GLFW_KEY_A) == GLFWKeyStatus.GLFW_PRESS)
     {
-        pd.move!"right()"(-speed);
+        pd.move!"right()"(-speed, w);
     }
     if (get_key(GLFWKey.GLFW_KEY_D) == GLFWKeyStatus.GLFW_PRESS)
     {
-        pd.move!"right()"(speed);
+        pd.move!"right()"(speed, w);
     }
 
 

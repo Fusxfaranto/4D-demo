@@ -26,6 +26,10 @@ bool is_transparent(BlockType b) {
     return b == BlockType.NONE;
 }
 
+bool has_collision(BlockType b) {
+    return b != BlockType.NONE;
+}
+
 
 struct IPos(size_t N)
 {
@@ -103,6 +107,19 @@ struct IPos(size_t N)
     // {
     //     return mixin("IPos!N(a " ~ op ~ " x, a " ~ op ~ " y, a " ~ op ~ " z, a " ~ op ~ " w)");
     // }
+
+    static flat_corners(Vec4 pos) {
+        typeof(this)[8] ps;
+        ps[0] = typeof(this)(pos);
+        ps[1] = ps[0].shift!"x"(1);
+        ps[2] = ps[0].shift!"z"(1);
+        ps[3] = ps[1].shift!"z"(1);
+        ps[4] = ps[0].shift!"w"(1);
+        ps[5] = ps[1].shift!"w"(1);
+        ps[6] = ps[2].shift!"w"(1);
+        ps[7] = ps[3].shift!"w"(1);
+        return ps;
+    }
 }
 
 float distance(T)(auto ref in T a, auto ref in T b) if (is(T : IPos!Np, size_t Np)) {

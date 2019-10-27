@@ -23,7 +23,7 @@ DC := dmd
 CFLAGS := -m64 -g -c -O3 -std=c11 -pedantic -Wall -Werror -Wno-error=unused-variable -Iinclude #-I/usr/include/freetype2/ #-Iftgl/src/
 DFLAGS := -m64 -g -c -O
 #DFLAGS += -d-debug=prof
-DFLAGS += -debug=prof # -profile=gc
+DFLAGS += # -debug=prof # -profile=gc
 #LDFLAGS := -Llib -lm -lSOIL -lGLEW -lglfw -lGL
 
 LDFLAGS := -L=-Llib
