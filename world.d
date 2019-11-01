@@ -5,7 +5,6 @@ import util;
 import matrix;
 import shapes;
 import chunk;
-import chunk_storage;
 import cross_section;
 import world_gen;
 
@@ -32,12 +31,17 @@ class World
         loaded_chunks = ChunkIndex(512 / CHUNK_SIZE);
     }
 
-    void update_chunk(ChunkPos cp) {
-        Chunk* c = cp in loaded_chunks;
-        assert(c); // TODO
 
-        c.update_from_internal();
-        update_chunk_from_surroundings(cp);
+    private void if_loaded(alias F)(ChunkPos loc) {
+        auto c = loc in loaded_chunks;
+        if (c is null) {
+            return;
+        }
+
+        F(*c);
+    }
+
+    private void update_surrounding_chunks(ChunkPos cp) {
         for (int i = 0; i < 8; i++)
         {
             ChunkPos adjacent_cp = void;
@@ -52,79 +56,15 @@ class World
             case 7: adjacent_cp = cp.shift!"w"(-1); break;
             }
 
-            update_chunk_from_surroundings(adjacent_cp);
+            if_loaded!update_chunk_from_surroundings(adjacent_cp);
         }
     }
 
 
-    Chunk fetch_chunk(ChunkPos loc)
-    {
-        debug(prof) profile_checkpoint();
-        Chunk c;
+    private void update_chunk_from_surroundings(ref Chunk c) {
+        ChunkPos loc = c.get_loc();
 
-        //c.update_gl_data(loc);
-        ChunkIndex loaded_chunks;
-
-        c.data = new ChunkData;
-        c.state = ChunkDataState.LOADED;
-        c.loc = loc;
-
-        //if (false)
-        // TODO cache the shit out of these
-        {
-            static immutable OctaveInfo[] ois = [
-                //{0.2,  5},
-                {0.1,  6},
-                {0.03,  30},
-                {0.002, 150},
-                {0.0005, 400},
-                //{0.00007, 1500},
-                ];
-            Vec4 base_p = loc.to_vec4() + Vec4(0.5, 0.5, 0.5, 0.5);
-            Vec4 base_p_height = base_p;
-            base_p_height.y = 0;
-            foreach (x; 0..CHUNK_SIZE) {
-                foreach (z; 0..CHUNK_SIZE) {
-                    foreach (w; 0..CHUNK_SIZE) {
-                        Vec4 p = base_p_height + Vec4(x, 0, z, w);
-                        double f = octaves!memo_perlin3(p, ois);
-                        float height = f - 30;
-                        int max_y = min(cast(int)(height - base_p.y), CHUNK_SIZE);
-                        for (int y = 0; y < max_y; y++) {
-                            c.data.grid[x][y][z][w] = BlockType.TEST;
-                        }
-                    }
-                }
-            }
-        }
-
-        c.update_from_internal();
-
-        writeln(c.state);
-
-        return c;
-    }
-
-
-    private void update_chunk_from_surroundings(ChunkPos loc) {
-        Chunk* c = loc in loaded_chunks;
-        if (c is null) {
-            return;
-        }
-
-        final switch (c.state) {
-        case ChunkDataState.INVALID:
-            assert(0);
-
-        case ChunkDataState.LOADED:
-        case ChunkDataState.OCCLUDED_UNLOADED:
-            break;
-
-        case ChunkDataState.EMPTY:
-            return;
-        }
-
-        c.occluded_from = 0;
+        ubyte occluded_from = 0;
         for (int i = 0; i < 8; i++)
         {
             ChunkPos adjacent_loc = void;
@@ -139,25 +79,27 @@ class World
             case 7: adjacent_loc = loc.shift!"w"(-1); break;
             }
 
-            const Chunk* p = adjacent_loc in loaded_chunks;
+            auto p = adjacent_loc in loaded_chunks;
             int relative_side = (i + 4) & 0b111;
             // an unloaded chunk counts as completely occluding
-            if (p is null || p.occludes_side & (1 << relative_side)) {
-                c.occluded_from |= 1 << i;
+            if (p is null || p.occludes_side(relative_side)) {
+                occluded_from |= 1 << i;
             }
         }
 
-        if (c.occluded_from == 0xff) {
+        if (occluded_from == 0xff) {
             c.unload_data!(ChunkDataState.OCCLUDED_UNLOADED)();
         } else {
             // TODO something more graceful than this
-            if (c.data is null) {
-                assert(c.gl_data is null);
-                assert(c.state == ChunkDataState.OCCLUDED_UNLOADED);
-                *c = fetch_chunk(loc);
+            if (c.get_state() == ChunkDataState.OCCLUDED_UNLOADED) {
+                assert(c.get_gl_data() is null);
+                // TODO does this leak stuff?
+                c = fetch_chunk(loc);
             }
 
-            c.update_gl_data(loc);
+            if (c.get_state() != ChunkDataState.EMPTY) {
+                c.update_gl_data();
+            }
         }
     }
 
@@ -215,7 +157,8 @@ class World
             }
 
             newly_loaded ~= cp;
-            loaded_chunks.set(fetch_chunk(cp));
+            //loaded_chunks.set(fetch_chunk(cp));
+            loaded_chunks.fetch(cp);
             writeln("loaded ", cp);
             debug(prof) profile_checkpoint();
 
@@ -243,7 +186,7 @@ class World
         // TODO i think this basically works but it overprocesses
         // should reuse processing_status?
         foreach (ref cp; newly_loaded) {
-            update_chunk_from_surroundings(cp);
+            if_loaded!update_chunk_from_surroundings(cp);
 
             for (int i = 0; i < 8; i++)
             {
@@ -259,7 +202,7 @@ class World
                 case 7: adjacent_cp = cp.shift!"w"(-1); break;
                 }
 
-                update_chunk_from_surroundings(adjacent_cp);
+                if_loaded!update_chunk_from_surroundings(adjacent_cp);
             }
         }
     }
@@ -268,7 +211,7 @@ class World
     BlockType get_block(BlockPos p) {
         ChunkPos cp = containing_chunkpos(p);
 
-        Chunk* c = cp in loaded_chunks;
+        auto c = cp in loaded_chunks;
         // TODO
         if (c is null) {
             load_chunks(cp.to_vec4_centered(), 1);
@@ -277,48 +220,25 @@ class World
         assert(c);
 
         BlockPos rel_p = p - cp;
-        //writefln("%s %s %s", p, cp, rel_p);
-        assert(rel_p.all!(format("a >= 0 && a < %s", CHUNK_SIZE))());
-
-        final switch (c.state) {
-        case ChunkDataState.INVALID:
-        case ChunkDataState.OCCLUDED_UNLOADED: // TODO
-            assert(0);
-
-        case ChunkDataState.EMPTY:
-            return BlockType.NONE;
-
-        case ChunkDataState.LOADED:
-            assert(c.data);
-            return c.data.grid[rel_p.x][rel_p.y][rel_p.z][rel_p.w];
-        }
+        return c.get_block(rel_p);
     }
 
     void set_block(BlockPos p, BlockType t) {
         ChunkPos cp = containing_chunkpos(p);
 
-        Chunk* c = cp in loaded_chunks;
-        assert(c); // TODO
+        {
+            auto c = cp in loaded_chunks;
+            assert(c); // TODO
 
-        BlockPos rel_p = p - cp;
-        //writefln("%s %s %s", p, cp, rel_p);
-        assert(rel_p.all!(format("a >= 0 && a < %s", CHUNK_SIZE))());
+            BlockPos rel_p = p - cp;
 
-        final switch (c.state) {
-        case ChunkDataState.INVALID:
-        case ChunkDataState.OCCLUDED_UNLOADED: // TODO
-            assert(0);
+            c.set_block(rel_p, t);
 
-        case ChunkDataState.EMPTY:
-            c.allocate_data();
-            goto case ChunkDataState.LOADED;
-
-        case ChunkDataState.LOADED:
-            assert(c.data);
-            c.data.grid[rel_p.x][rel_p.y][rel_p.z][rel_p.w] = t;
+            c.update_from_internal();
+            update_chunk_from_surroundings(*c);
         }
 
-        update_chunk(cp);
+        update_surrounding_chunks(cp);
     }
 
     BlockFace target_nonempty(Vec4 base_pos, Vec4 dir, float max_dist = 10) {

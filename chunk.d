@@ -1,4 +1,4 @@
-
+import std.algorithm : min;
 import std.range : back;
 import std.array : empty;
 import std.conv : to;
@@ -9,6 +9,7 @@ import core.memory : GC;
 
 import matrix;
 import render_bindings;
+import world_gen;
 import util;
 
 
@@ -195,28 +196,27 @@ enum ChunkDataState {
 //    SPARSE, // TODO?
 }
 
-enum ChunkProcessingStatus
-{
-    NOT_PROCESSED,
-    PROCESSED,
-}
 
 struct Chunk
 {
-    ChunkPos loc = ChunkPos.INVALID;
+    @disable this(this);
 
-    ChunkData *data;
-    ChunkGLData *gl_data;
+    private ChunkPos loc = ChunkPos.INVALID;
 
-    ubyte occludes_side;
-    ubyte occluded_from;
+    private ChunkData* data;
+    private ChunkGLData* gl_data;
 
-    ChunkDataState state = ChunkDataState.INVALID;
-    ChunkProcessingStatus processing_status;
+    private ubyte occludes_side_b;
 
-    SpinLock lock;
+    private ChunkDataState state = ChunkDataState.INVALID;
 
-    void transition_state(ChunkDataState s) {
+    private SpinLock lock;
+
+    invariant {
+        lock.assert_locked();
+    }
+
+    private void transition_state(ChunkDataState s) {
         writefln("transitioning %s -> %s", state, s);
         state = s;
     }
@@ -284,35 +284,35 @@ struct Chunk
         bool empty = true;
 
         // TODO this is naive and can probably be an order faster
-        occludes_side = 0xff;
+        occludes_side_b = 0xff;
         for (size_t x = 0; x < CHUNK_SIZE; x++) {
             for (size_t y = 0; y < CHUNK_SIZE; y++) {
                 for (size_t z = 0; z < CHUNK_SIZE; z++) {
                     for (size_t w = 0; w < CHUNK_SIZE; w++) {
                         if (is_transparent(data.grid[x][y][z][w])) {
                             if (x == 0) {
-                                occludes_side &= ~(1 << 4);
+                                occludes_side_b &= ~(1 << 4);
                             }
                             if (y == 0) {
-                                occludes_side &= ~(1 << 5);
+                                occludes_side_b &= ~(1 << 5);
                             }
                             if (z == 0) {
-                                occludes_side &= ~(1 << 6);
+                                occludes_side_b &= ~(1 << 6);
                             }
                             if (w == 0) {
-                                occludes_side &= ~(1 << 7);
+                                occludes_side_b &= ~(1 << 7);
                             }
                             if (x == CHUNK_SIZE - 1) {
-                                occludes_side &= ~(1 << 0);
+                                occludes_side_b &= ~(1 << 0);
                             }
                             if (y == CHUNK_SIZE - 1) {
-                                occludes_side &= ~(1 << 1);
+                                occludes_side_b &= ~(1 << 1);
                             }
                             if (z == CHUNK_SIZE - 1) {
-                                occludes_side &= ~(1 << 2);
+                                occludes_side_b &= ~(1 << 2);
                             }
                             if (w == CHUNK_SIZE - 1) {
-                                occludes_side &= ~(1 << 3);
+                                occludes_side_b &= ~(1 << 3);
                             }
                         } else {
                             empty = false;
@@ -327,7 +327,7 @@ struct Chunk
         }
     }
 
-    void update_gl_data(ChunkPos loc) {
+    void update_gl_data() {
         assert(data, format("%s %s", loc, state));
         //writeln("updating ", loc);
 
@@ -426,6 +426,8 @@ struct Chunk
             process_cuboid(blockoid_pos, Vec4BasisSigned.W);
         }
 
+        // TODO add some sort of occluded state to let occluded blocks
+        // be part of any blockoid regardless of type
         ChunkGrid!BlockState state_grid = void;
         for (int i; i < BLOCKS_IN_CHUNK; i++)
         {
@@ -609,10 +611,187 @@ struct Chunk
 
         assign_chunk_gl_data(&gl_data, vert_data.ptr, cast(int)(vert_data.length));
     }
+
+    // TODO is there a more threading-aware way to do this?
+    ChunkGLData* get_gl_data() {
+        final switch (state) {
+        case ChunkDataState.INVALID:
+            assert(0);
+
+        case ChunkDataState.LOADED:
+            assert(gl_data);
+            return gl_data;
+
+        case ChunkDataState.EMPTY:
+        case ChunkDataState.OCCLUDED_UNLOADED:
+            assert(!gl_data);
+            return null;
+        }
+    }
+
+    ChunkDataState get_state() const {
+        return state;
+    }
+
+    ChunkPos get_loc() const {
+        return loc;
+    }
+
+    bool occludes_side(int s) const {
+        return cast(bool)(occludes_side_b & (1 << s));
+    }
+
+    BlockType get_block(BlockPos rel_p) {
+        assert(rel_p.all!(format("a >= 0 && a < %s", CHUNK_SIZE))());
+
+        final switch (state) {
+        case ChunkDataState.INVALID:
+        case ChunkDataState.OCCLUDED_UNLOADED: // TODO
+            assert(0);
+
+        case ChunkDataState.EMPTY:
+            return BlockType.NONE;
+
+        case ChunkDataState.LOADED:
+            assert(data);
+            return data.grid[rel_p.x][rel_p.y][rel_p.z][rel_p.w];
+        }
+    }
+
+    // TODO this function leaves the chunk in a dirty state, should
+    // we do something about that?
+    void set_block(BlockPos rel_p, BlockType t) {
+        assert(rel_p.all!(format("a >= 0 && a < %s", CHUNK_SIZE))());
+
+        final switch (state) {
+        case ChunkDataState.INVALID:
+        case ChunkDataState.OCCLUDED_UNLOADED: // TODO
+            assert(0);
+
+        case ChunkDataState.EMPTY:
+            allocate_data();
+            goto case ChunkDataState.LOADED;
+
+        case ChunkDataState.LOADED:
+            assert(data);
+            data.grid[rel_p.x][rel_p.y][rel_p.z][rel_p.w] = t;
+        }
+    }
 }
 
 
 int chunkpos_l1_dist(ChunkPos a, ChunkPos b)
 {
     return abs(a.x - b.x) + abs(a.y - b.y) + abs(a.z - b.z) + abs(a.w - b.w);
+}
+
+
+
+Chunk fetch_chunk(ChunkPos loc)
+{
+    debug(prof) profile_checkpoint();
+    Chunk c;
+
+    //c.update_gl_data(loc);
+
+    c.data = new ChunkData;
+    c.state = ChunkDataState.LOADED;
+    c.loc = loc;
+
+    //if (false)
+    // TODO cache the shit out of these
+    {
+        static immutable OctaveInfo[] ois = [
+            //{0.2,  5},
+            {0.1,  6},
+            {0.03,  30},
+            {0.002, 150},
+            {0.0005, 400},
+            //{0.00007, 1500},
+            ];
+        Vec4 base_p = loc.to_vec4() + Vec4(0.5, 0.5, 0.5, 0.5);
+        Vec4 base_p_height = base_p;
+        base_p_height.y = 0;
+        foreach (x; 0..CHUNK_SIZE) {
+            foreach (z; 0..CHUNK_SIZE) {
+                foreach (w; 0..CHUNK_SIZE) {
+                    Vec4 p = base_p_height + Vec4(x, 0, z, w);
+                    double f = octaves!memo_perlin3(p, ois);
+                    float height = f - 30;
+                    int max_y = min(cast(int)(height - base_p.y), CHUNK_SIZE);
+                    for (int y = 0; y < max_y; y++) {
+                        c.data.grid[x][y][z][w] = BlockType.TEST;
+                    }
+                }
+            }
+        }
+    }
+
+    // TODO something better than this?
+    c.lock.claim();
+    c.update_from_internal();
+
+    writeln(c.state);
+
+    return c;
+}
+
+
+
+
+struct ChunkIndex {
+    private alias LockedChunkP = SpinLock.LockedP!Chunk;
+
+    Chunk[] data;
+    uint span;
+
+    this(uint s) {
+        span = s;
+        data = new Chunk[span ^^ 4];
+    }
+
+    private Chunk* index()(auto ref ChunkPos cp) {
+        return &data[
+            (cp.w % span) +
+            (cp.z % span) * span +
+            (cp.y % span) * (span ^^ 2) +
+            (cp.x % span) * (span ^^ 3)
+            ];
+    }
+
+    LockedChunkP opBinaryRight(string s : "in")(auto ref ChunkPos cp) {
+        Chunk* c = index(cp);
+        auto l = c.lock();
+        return c.loc == cp ?
+            LockedChunkP(c, l) :
+            LockedChunkP(null);
+    }
+
+    version(none) {
+        void set()(auto ref Chunk c) {
+            c.lock.assert_unlocked();
+            Chunk* old_c = index(c.loc);
+            auto l = old_c.lock();
+
+            // TODO this leaks overwritten chunks (gl data etc)
+            assert(old_c.state == ChunkDataState.INVALID);
+
+            *old_c = c;
+        }
+    }
+
+    // TODO this is gross, implement move semantics or something
+    void fetch()(auto ref ChunkPos cp) {
+        Chunk* old_c = index(cp);
+        auto l = old_c.lock();
+
+        // TODO this leaks overwritten chunks (gl data etc)
+        assert(old_c.state == ChunkDataState.INVALID);
+
+        *old_c = fetch_chunk(cp);
+    }
+
+    // ref Chunk opIndexAssign()(auto ref Chunk c, auto ref ChunkPos cp) {
+    //     return (*index(cp) = c);
+    // }
 }

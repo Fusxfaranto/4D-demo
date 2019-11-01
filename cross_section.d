@@ -22,6 +22,7 @@ private {
 }
 
 
+
 // TODO there is still allocations (and therefore GC) happening in this function at steady state.  array literals are probably the culprit
 
 void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[] objects, float render_radius, bool cube_culling,
@@ -61,30 +62,17 @@ void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[
         //writeln("processing ", cp);
         //scratch_strings ~= cp.to!string();
         processed_cps ~= cp;
-        assert(c.processing_status == ChunkProcessingStatus.NOT_PROCESSED);
-        c.processing_status = ChunkProcessingStatus.PROCESSED;
 
-        assert(c.state != ChunkDataState.INVALID);
-
-        final switch (c.state) {
-        case ChunkDataState.INVALID:
-            assert(0);
-
-        case ChunkDataState.LOADED:
-            assert(c.gl_data);
-            //writefln("adding %s", cp);
-            *gl_data_p++ = c.gl_data;
-            break;
-
-        case ChunkDataState.EMPTY:
-        case ChunkDataState.OCCLUDED_UNLOADED:
-            break;
+        if (ChunkGLData* p = c.get_gl_data()) {
+            *gl_data_p++ = p;
         }
     }
 
-    Chunk* center = center_cp in world.loaded_chunks;
-    assert(center);
-    process_chunk(*center, center_cp);
+    {
+        auto center = center_cp in world.loaded_chunks;
+        assert(center);
+        process_chunk(*center, center_cp);
+    }
 
     while (!cs_stack.empty())
     {
@@ -125,13 +113,22 @@ void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[
             }
 
             //writeln(cs_stack.length, ' ', cs_stack.capacity);
-            Chunk* p = new_cp in world.loaded_chunks;
-            if (p && p.processing_status == ChunkProcessingStatus.NOT_PROCESSED)
-            {
-                cs_stack ~= new_cp;
-                //debug(prof) sw.stop();
-                process_chunk(*p, new_cp);
-                //debug(prof) sw.start();
+            if (auto p = new_cp in world.loaded_chunks) {
+                // TODO what's the perf like on this?
+                bool found = false;
+                foreach (ref e; processed_cps) {
+                    if (e == new_cp) {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    cs_stack ~= new_cp;
+                    //debug(prof) sw.stop();
+                    process_chunk(*p, new_cp);
+                    //debug(prof) sw.start();
+                }
             }
             //writeln(cs_stack.length, ' ', cs_stack.capacity);
             //writeln();
@@ -140,13 +137,6 @@ void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[
 
     *gl_data_p++ = null;
 
-    //writeln(processed_cps);
-    foreach (cp; processed_cps)
-    {
-        Chunk* c = cp in world.loaded_chunks;
-        assert(c);
-        c.processing_status = ChunkProcessingStatus.NOT_PROCESSED;
-    }
     processed_cps.unsafe_reset();
 
     //writeln(objects[0..10]);

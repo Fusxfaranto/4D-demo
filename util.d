@@ -4,6 +4,7 @@ public import std.stdio : write, writeln, writef, writefln;
 public import std.typecons : Tuple, tuple;
 
 import core.atomic : atomicStore, cas;
+//import std.algorithm : move;
 import std.traits : OriginalType, isIntegral;
 import std.datetime.stopwatch : StopWatch;
 import std.datetime : to, TickDuration;
@@ -109,9 +110,19 @@ shared struct SpinLock {
         SpinLock* l;
         ~this() {
             //writefln("unlock: %s", &l.is_locked);
-            l.assert_locked();
-            atomicStore(l.is_locked, false);
+            if (l) {
+                l.assert_locked();
+                atomicStore(l.is_locked, false);
+            }
         }
+
+        Locker move() {
+            Locker n = Locker(l);
+            l = null;
+            return n;
+        }
+
+        @disable this(this);
     }
 
     private bool is_locked;
@@ -125,17 +136,37 @@ shared struct SpinLock {
         return Locker(&this);
     }
 
+    // TODO i'd prefer to not have this
     void claim() {
         //writefln("claim: %s", &is_locked);
         assert_unlocked();
         atomicStore(is_locked, true);
     }
 
-    void assert_locked() {
+    void assert_locked() const {
         assert(is_locked);
     }
 
-    void assert_unlocked() {
+    void assert_unlocked() const {
         assert(!is_locked);
+    }
+
+    struct LockedP(T, string field = "lock") {
+        T* p;
+        alias p this;
+
+        Locker locker;
+
+        this(T* p_) {
+            assert(p is null);
+        }
+
+        this(T* p_, ref Locker l) {
+            p = p_;
+            assert(p);
+            locker = l.move();
+        }
+
+        @disable this(this);
     }
 }
