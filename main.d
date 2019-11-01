@@ -18,7 +18,7 @@ import cross_section;
 import world;
 
 
-World w;
+__gshared World w = null;
 
 BlockFace targeted_block = BlockFace.INVALID;
 
@@ -77,6 +77,8 @@ void main()
 
     Vec3 compass_base_ = Vec3(0, 0, 0);
     compass_base = compass_base_.data();
+
+    w = new World;
 
 /*
                   w.scene ~= tesseract(Vec4(-30, -30, -30, -30), Vec4(60, 60, 60, 60));
@@ -251,9 +253,9 @@ void main()
         compass = compass_.data();
         debug(prof) profile_checkpoint();
 
-        float render_radius = 700;
-        //load_chunks(pd.pos, cast(int)(render_radius / CHUNK_SIZE) + 1, w.loaded_chunks);
-        w.load_chunks(pd.pos, 70 / CHUNK_SIZE);
+        float render_radius = 30;
+        w.load_chunks(pd.pos, cast(int)(render_radius / CHUNK_SIZE));
+        //w.load_chunks(pd.pos, 70 / CHUNK_SIZE);
 
         //scratch_strings ~= to!string(w.loaded_chunks.length);
         //scratch_strings ~= to!string(coords_to_chunkpos(pd.pos));

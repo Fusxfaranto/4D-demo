@@ -5,6 +5,7 @@ import util;
 import matrix;
 import shapes;
 import chunk;
+import chunk_storage;
 import cross_section;
 import world_gen;
 
@@ -17,13 +18,19 @@ struct BlockFace {
 }
 
 
-struct World
+
+class World
 {
     Vertex[4][] scene;
     Vertex[4][] character;
 
-    Chunk[ChunkPos] loaded_chunks;
+    ChunkIndex loaded_chunks;
     //ChunkData[] chunk_data_pool;
+
+    this() {
+        // TODO don't hardcode
+        loaded_chunks = ChunkIndex(512 / CHUNK_SIZE);
+    }
 
     void update_chunk(ChunkPos cp) {
         Chunk* c = cp in loaded_chunks;
@@ -56,9 +63,11 @@ struct World
         Chunk c;
 
         //c.update_gl_data(loc);
+        ChunkIndex loaded_chunks;
 
         c.data = new ChunkData;
         c.state = ChunkDataState.LOADED;
+        c.loc = loc;
 
         //if (false)
         // TODO cache the shit out of these
@@ -206,7 +215,7 @@ struct World
             }
 
             newly_loaded ~= cp;
-            loaded_chunks[cp] = fetch_chunk(cp);
+            loaded_chunks.set(fetch_chunk(cp));
             writeln("loaded ", cp);
             debug(prof) profile_checkpoint();
 

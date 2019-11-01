@@ -3,6 +3,7 @@ public import std.conv : to;
 public import std.stdio : write, writeln, writef, writefln;
 public import std.typecons : Tuple, tuple;
 
+import core.atomic : atomicStore, cas;
 import std.traits : OriginalType, isIntegral;
 import std.datetime.stopwatch : StopWatch;
 import std.datetime : to, TickDuration;
@@ -99,4 +100,42 @@ void unsafe_assign(alias init, T)(ref T[] a) {
 
 T reinterpret(T, U)(auto ref U u) if (T.sizeof) {
     return *cast(T*)(&u);
+}
+
+
+
+shared struct SpinLock {
+    private struct Locker {
+        SpinLock* l;
+        ~this() {
+            //writefln("unlock: %s", &l.is_locked);
+            l.assert_locked();
+            atomicStore(l.is_locked, false);
+        }
+    }
+
+    private bool is_locked;
+
+    Locker opCall() {
+        //writefln("lock: %s", &is_locked);
+        assert_unlocked(); // TODO only true with one thread
+        bool v = false;
+        do {} while (cas(&is_locked, &v, true));
+        assert(v);
+        return Locker(&this);
+    }
+
+    void claim() {
+        //writefln("claim: %s", &is_locked);
+        assert_unlocked();
+        atomicStore(is_locked, true);
+    }
+
+    void assert_locked() {
+        assert(is_locked);
+    }
+
+    void assert_unlocked() {
+        assert(!is_locked);
+    }
 }

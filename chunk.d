@@ -203,7 +203,7 @@ enum ChunkProcessingStatus
 
 struct Chunk
 {
-    //ChunkPos location;
+    ChunkPos loc = ChunkPos.INVALID;
 
     ChunkData *data;
     ChunkGLData *gl_data;
@@ -211,8 +211,10 @@ struct Chunk
     ubyte occludes_side;
     ubyte occluded_from;
 
-    ChunkDataState state;
+    ChunkDataState state = ChunkDataState.INVALID;
     ChunkProcessingStatus processing_status;
+
+    SpinLock lock;
 
     void transition_state(ChunkDataState s) {
         writefln("transitioning %s -> %s", state, s);

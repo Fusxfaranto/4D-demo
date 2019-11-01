@@ -82,8 +82,9 @@ void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[
         }
     }
 
-    assert(center_cp in world.loaded_chunks);
-    process_chunk(world.loaded_chunks[center_cp], center_cp);
+    Chunk* center = center_cp in world.loaded_chunks;
+    assert(center);
+    process_chunk(*center, center_cp);
 
     while (!cs_stack.empty())
     {
@@ -142,7 +143,9 @@ void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[
     //writeln(processed_cps);
     foreach (cp; processed_cps)
     {
-        world.loaded_chunks[cp].processing_status = ChunkProcessingStatus.NOT_PROCESSED;
+        Chunk* c = cp in world.loaded_chunks;
+        assert(c);
+        c.processing_status = ChunkProcessingStatus.NOT_PROCESSED;
     }
     processed_cps.unsafe_reset();
 
