@@ -74,6 +74,7 @@ void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[
         process_chunk(*center, center_cp);
     }
 
+    // TODO view frustum-based culling
     while (!cs_stack.empty())
     {
         ChunkPos cp = cs_stack.back();
@@ -107,7 +108,8 @@ void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[
                 continue;
             }
 
-            if (rel_center.l1_norm() > render_radius)
+            //if (rel_center.l1_norm() > render_radius)
+            if (!rel_center.in_vert_sph(render_radius, world.HEIGHT_RATIO * render_radius))
             {
                 continue;
             }

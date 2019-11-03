@@ -3,11 +3,11 @@ public import std.conv : to;
 public import std.stdio : write, writeln, writef, writefln;
 public import std.typecons : Tuple, tuple;
 
-import core.atomic : atomicStore, cas;
-//import std.algorithm : move;
-import std.traits : OriginalType, isIntegral;
+import core.atomic : atomicLoad, atomicStore, cas;
 import std.datetime.stopwatch : StopWatch;
 import std.datetime : to, TickDuration;
+import std.process : thisThreadID;
+import std.traits : OriginalType, isIntegral;
 
 
 enum float LARGE_FLOAT = 1e20;
@@ -126,13 +126,13 @@ shared struct SpinLock {
     }
 
     private bool is_locked;
+    private ulong locking_thread_id;
 
     Locker opCall() {
         //writefln("lock: %s", &is_locked);
-        assert_unlocked(); // TODO only true with one thread
-        bool v = false;
-        do {} while (cas(&is_locked, &v, true));
-        assert(v);
+        assert(!atomicLoad(is_locked) || atomicLoad(locking_thread_id) != thisThreadID());
+        do {} while (cas(&is_locked, false, true));
+        atomicStore(locking_thread_id, thisThreadID());
         return Locker(&this);
     }
 
@@ -140,15 +140,16 @@ shared struct SpinLock {
     void claim() {
         //writefln("claim: %s", &is_locked);
         assert_unlocked();
+        atomicStore(locking_thread_id, thisThreadID());
         atomicStore(is_locked, true);
     }
 
     void assert_locked() const {
-        assert(is_locked);
+        assert(atomicLoad(is_locked));
     }
 
     void assert_unlocked() const {
-        assert(!is_locked);
+        assert(!atomicLoad(is_locked));
     }
 
     struct LockedP(T, string field = "lock") {

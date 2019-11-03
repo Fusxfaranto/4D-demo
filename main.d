@@ -81,26 +81,26 @@ void main()
     w = new World;
 
 /*
-                  w.scene ~= tesseract(Vec4(-30, -30, -30, -30), Vec4(60, 60, 60, 60));
-                  w.scene ~= tesseract(Vec4(-10, -2, -10, -10), Vec4(20, 2, 20, 20));
-                  w.scene ~= tesseract(Vec4(-3.5, 2, -6, 3), Vec4(1, 1, 1, 1),
-                  rot(Vec4(1, 1, 1, 1), Vec4(0, 0, 0, 1), deg_to_rad(45)));
-                  w.scene ~= tesseract(Vec4(-.5, 0, -3, 0), Vec4(1, 1, 1, 1));
-                  w.scene ~= tesseract(Vec4(1, 0, -3, 0), Vec4(1, 1, 1, 5));
-                  w.scene ~= tesseract(Vec4(0, 0, 3, 0));
-                  w.scene ~= tesseract(Vec4(0, 0, 4, 0));
-                  w.scene ~= tesseract(Vec4(0, 0, 5, 0));
-                  w.scene ~= tesseract(Vec4(1, 0, 4, 0));
-                  w.scene ~= tesseract(Vec4(-1, 0, 4, 0));
-                  w.scene ~= tesseract(Vec4(0, 0, 4, 1));
-                  w.scene ~= tesseract(Vec4(0, 0, 4, -1));
-                  w.scene ~= tesseract(Vec4(0, 1, 4, 0));
-                  w.scene ~= fivecell(Vec4(4, 2, 4, 0));
-                  w.scene ~= tesseract(Vec4(4, 0, -4, 0), Vec4(0.2, 1.5, 3, 1));
-                  w.scene ~= tesseract(Vec4(5.6, 0, -4, 0), Vec4(0.2, 1.5, 3, 1));
-                  w.scene ~= tesseract(Vec4(4.2, 0, -4, 0), Vec4(1.4, 1.5, 0.2, 1));
-                  w.scene ~= tesseract(Vec4(4.2, 0, -1.2, 0), Vec4(1.4, 1.5, 0.2, 1));
-                  w.scene ~= tesseract(Vec4(4, 1.5, -4, 0), Vec4(1.8, 0.2, 3, 1));*/
+  w.scene ~= tesseract(Vec4(-30, -30, -30, -30), Vec4(60, 60, 60, 60));
+  w.scene ~= tesseract(Vec4(-10, -2, -10, -10), Vec4(20, 2, 20, 20));
+  w.scene ~= tesseract(Vec4(-3.5, 2, -6, 3), Vec4(1, 1, 1, 1),
+  rot(Vec4(1, 1, 1, 1), Vec4(0, 0, 0, 1), deg_to_rad(45)));
+  w.scene ~= tesseract(Vec4(-.5, 0, -3, 0), Vec4(1, 1, 1, 1));
+  w.scene ~= tesseract(Vec4(1, 0, -3, 0), Vec4(1, 1, 1, 5));
+  w.scene ~= tesseract(Vec4(0, 0, 3, 0));
+  w.scene ~= tesseract(Vec4(0, 0, 4, 0));
+  w.scene ~= tesseract(Vec4(0, 0, 5, 0));
+  w.scene ~= tesseract(Vec4(1, 0, 4, 0));
+  w.scene ~= tesseract(Vec4(-1, 0, 4, 0));
+  w.scene ~= tesseract(Vec4(0, 0, 4, 1));
+  w.scene ~= tesseract(Vec4(0, 0, 4, -1));
+  w.scene ~= tesseract(Vec4(0, 1, 4, 0));
+  w.scene ~= fivecell(Vec4(4, 2, 4, 0));
+  w.scene ~= tesseract(Vec4(4, 0, -4, 0), Vec4(0.2, 1.5, 3, 1));
+  w.scene ~= tesseract(Vec4(5.6, 0, -4, 0), Vec4(0.2, 1.5, 3, 1));
+  w.scene ~= tesseract(Vec4(4.2, 0, -4, 0), Vec4(1.4, 1.5, 0.2, 1));
+  w.scene ~= tesseract(Vec4(4.2, 0, -1.2, 0), Vec4(1.4, 1.5, 0.2, 1));
+  w.scene ~= tesseract(Vec4(4, 1.5, -4, 0), Vec4(1.8, 0.2, 3, 1));*/
 
 
     w.scene.length = 0;
@@ -253,8 +253,8 @@ void main()
         compass = compass_.data();
         debug(prof) profile_checkpoint();
 
-        float render_radius = 30;
-        w.load_chunks(pd.pos, cast(int)(render_radius / CHUNK_SIZE));
+        float render_radius = 56;
+        w.load_chunks(pd.pos, cast(int)(render_radius / CHUNK_SIZE) + 2);
         //w.load_chunks(pd.pos, 70 / CHUNK_SIZE);
 
         //scratch_strings ~= to!string(w.loaded_chunks.length);
@@ -301,10 +301,14 @@ void main()
                     break;
 
                 }
-                w.scene = tesseract!(false, solid_color_gen!(0.6, 0.6, 0.6))(
-                    targeted_block.pos.to_vec4() - F * Vec4(1, 1, 1, 1),
-                    (1 + 2 * F) * Vec4(1, 1, 1, 1),
-                    )[loc..(loc + 5)];
+                if (!ui_hidden) {
+                    w.scene = tesseract!(false, solid_color_gen!(0.6, 0.6, 0.6))(
+                        targeted_block.pos.to_vec4() - F * Vec4(1, 1, 1, 1),
+                        (1 + 2 * F) * Vec4(1, 1, 1, 1),
+                        )[loc..(loc + 5)];
+                } else {
+                    w.scene = [];
+                }
             } else {
                 //scratch_strings ~= "none";
                 w.scene = [];
@@ -460,29 +464,33 @@ extern (C) void key_callback(GLFWwindow* window, int key, int scancode, int acti
         break;
     }
 
-    case GLFWKey.GLFW_KEY_BACKSPACE:
-    {
-        writeln("front: ", pd.front);
-        writeln("up: ", pd.up);
-        writeln("normal: ", pd.normal);
-        writeln("right: ", pd.right());
-        writeln("position: ", pd.pos);
-
-        writeln(dot_p(pd.normal, pd.up));
-        writeln(dot_p(pd.front, pd.up));
-        writeln(dot_p(pd.front, pd.normal));
-
-        Vec4 flat_front = pd.front - proj(pd.front, GLOBAL_UP);
-        writeln(flat_front);
-        writeln(acos(dot_p(Vec4(1, 0, 0, 0), flat_front)
-                     / flat_front.magnitude()) * 180 / PI);
-        writeln(rot(Vec4(1, 0, 0, 0), flat_front,
-                    acos(dot_p(Vec4(1, 0, 0, 0), flat_front)
-                         / flat_front.magnitude())));
-
-        writeln();
+    case GLFWKey.GLFW_KEY_BACKSPACE: {
+        ui_hidden ^= true;
         break;
     }
+
+        version(none) {
+            writeln("front: ", pd.front);
+            writeln("up: ", pd.up);
+            writeln("normal: ", pd.normal);
+            writeln("right: ", pd.right());
+            writeln("position: ", pd.pos);
+
+            writeln(dot_p(pd.normal, pd.up));
+            writeln(dot_p(pd.front, pd.up));
+            writeln(dot_p(pd.front, pd.normal));
+
+            Vec4 flat_front = pd.front - proj(pd.front, GLOBAL_UP);
+            writeln(flat_front);
+            writeln(acos(dot_p(Vec4(1, 0, 0, 0), flat_front)
+                         / flat_front.magnitude()) * 180 / PI);
+            writeln(rot(Vec4(1, 0, 0, 0), flat_front,
+                        acos(dot_p(Vec4(1, 0, 0, 0), flat_front)
+                             / flat_front.magnitude())));
+
+            writeln();
+            break;
+        }
 
     case GLFWKey.GLFW_KEY_ENTER:
     {

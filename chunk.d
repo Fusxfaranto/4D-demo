@@ -124,7 +124,12 @@ struct IPos(size_t N)
 }
 
 float distance(T)(auto ref in T a, auto ref in T b) if (is(T : IPos!Np, size_t Np)) {
-    return sqrt(to!real((a.x - b.x) ^^ 2 + (a.y - b.y) ^^ 2 + (a.z - b.z) ^^ 2 + (a.w - b.w) ^^ 2));
+    return sqrt(to!double((a.x - b.x) ^^ 2 + (a.y - b.y) ^^ 2 + (a.z - b.z) ^^ 2 + (a.w - b.w) ^^ 2));
+}
+
+bool in_vert_sph(T)(auto ref in T a, double radius, double height) {
+    return sqrt(to!double(a.x ^^ 2 + a.z ^^ 2 + a.w ^^ 2)) < radius &&
+        abs(a.y) < height;
 }
 
 
@@ -244,8 +249,11 @@ struct Chunk
 
         final switch (state) {
         case ChunkDataState.INVALID:
-        case ChunkDataState.EMPTY:
             assert(0, format("%s", state));
+
+        case ChunkDataState.EMPTY:
+            writefln("%s unloading from empty, is that ok??", loc);
+            return;
 
         case ChunkDataState.OCCLUDED_UNLOADED:
             return;
@@ -702,7 +710,7 @@ Chunk fetch_chunk(ChunkPos loc)
     // TODO cache the shit out of these
     {
         static immutable OctaveInfo[] ois = [
-            //{0.2,  5},
+            {0.2,  4},
             {0.1,  6},
             {0.03,  30},
             {0.002, 150},
@@ -781,7 +789,7 @@ struct ChunkIndex {
     }
 
     // TODO this is gross, implement move semantics or something
-    void fetch()(auto ref ChunkPos cp) {
+    LockedChunkP fetch()(auto ref ChunkPos cp) {
         Chunk* old_c = index(cp);
         auto l = old_c.lock();
 
@@ -789,6 +797,7 @@ struct ChunkIndex {
         assert(old_c.state == ChunkDataState.INVALID);
 
         *old_c = fetch_chunk(cp);
+        return LockedChunkP(old_c, l);
     }
 
     // ref Chunk opIndexAssign()(auto ref Chunk c, auto ref ChunkPos cp) {

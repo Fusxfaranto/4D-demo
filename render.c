@@ -110,6 +110,8 @@ struct
     float line_spacing;
 } screen_text_data[MAX_TEXTS];
 
+int ui_hidden = 0;
+
 
 
 
@@ -182,7 +184,7 @@ int init(void)
     glewInit();
 
     //assert(glfwRawMouseMotionSupported());
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED | GLFW_CURSOR_HIDDEN);
     
 
     CHECK_RES(create_shader(&base_shader, "vertex.glsl", NULL, "fragment.glsl"));
@@ -649,6 +651,9 @@ void render(void)
     glBindVertexArray(fb_rectangle_vao);
     glDisable(GL_DEPTH_TEST);
     glBindTexture(GL_TEXTURE_2D, main_tex);
+
+    glUniform1i(0, ui_hidden);
+
     glDrawArrays(GL_POINTS, 0, 1);
     /* glBindTexture(GL_TEXTURE_2D, compass_tex); */
     /* glDrawArrays(GL_POINTS, 1, 1); */
@@ -668,24 +673,25 @@ void render(void)
     glBindVertexArray(0);
 
 
-    for (size_t i = 0; i < MAX_TEXTS; i++)
-    {
-        if (screen_text_data[i].a.p)
+    if (!ui_hidden) {
+        for (size_t i = 0; i < MAX_TEXTS; i++)
         {
-            for (size_t j = 0; j < screen_text_data[i].a.l; j++)
+            if (screen_text_data[i].a.p)
             {
-                //render_text(lines_to_render.p[i], font, -0.6, 1 - i * 0.1, 0.000001 * height, 0.000001 * width);
-                //render_text(screen_text_data[i].a.p[j], font, -0.6, 1 - i * 0.1, 0.001, 0.001 * ratio);
-                render_text(screen_text_data[i].a.p[j],
-                            font,
-                            screen_text_data[i].x,
-                            screen_text_data[i].y - j * screen_text_data[i].line_spacing,
-                            screen_text_data[i].x_scale,
-                            screen_text_data[i].y_scale * ratio);
+                for (size_t j = 0; j < screen_text_data[i].a.l; j++)
+                {
+                    //render_text(lines_to_render.p[i], font, -0.6, 1 - i * 0.1, 0.000001 * height, 0.000001 * width);
+                    //render_text(screen_text_data[i].a.p[j], font, -0.6, 1 - i * 0.1, 0.001, 0.001 * ratio);
+                    render_text(screen_text_data[i].a.p[j],
+                                font,
+                                screen_text_data[i].x,
+                                screen_text_data[i].y - j * screen_text_data[i].line_spacing,
+                                screen_text_data[i].x_scale,
+                                screen_text_data[i].y_scale * ratio);
+                }
             }
         }
     }
-
     glfwSwapBuffers(window);
 }
 

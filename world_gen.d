@@ -12,7 +12,7 @@ __gshared Vec4[16] rand_normal_vec4_table;
 static this() {
     alias RGen = Xorshift32;
 
-    enum SEED = 0;
+    enum SEED = 876476;
     auto rgen = RGen(SEED);
     alias gen = uniform!("[]", double, double, RGen);
 

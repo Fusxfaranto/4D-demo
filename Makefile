@@ -17,8 +17,8 @@ OBJS := $(C_OBJS) $(D_OBJS)
 #DC := ./gdc/x86_64-pc-linux-gnu/bin/x86_64-linux-gnu-gdc
 #DC := ./ldc/build/bin/ldc2
 #DC := gdc
-#DC := ldc2
-DC := dmd
+DC := ldc2
+#DC := dmd
 
 CFLAGS := -m64 -g -c -O3 -std=c11 -pedantic -Wall -Werror -Wno-error=unused-variable -Iinclude #-I/usr/include/freetype2/ #-Iftgl/src/
 DFLAGS := -m64 -g -c -O

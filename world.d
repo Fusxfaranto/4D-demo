@@ -7,6 +7,7 @@ import shapes;
 import chunk;
 import cross_section;
 import world_gen;
+import workers;
 
 
 struct BlockFace {
@@ -103,56 +104,60 @@ class World
         }
     }
 
+    // TODO something better
+    auto load_chunk(ChunkPos cp) {
+        {
+            auto c = loaded_chunks.fetch(cp);
+            update_chunk_from_surroundings(*c);
+        }
+        update_surrounding_chunks(cp);
+        return cp in loaded_chunks;
+    }
 
-    // TODO this need some general rethinking
+    enum HEIGHT_RATIO = 0.6;
     void load_chunks(Vec4 center, int radius)
     {
-        static ChunkPos[] load_stack;
-        load_stack.unsafe_reset();
-
-        //GC.disable();
-        //scope(exit) GC.enable();
-
         ChunkPos center_cp = ChunkPos(center);
         //if (center_cp in loaded_chunks)
-        if (true)
-        {
+        // TODO
+        for (int r = 3 + radius % 3; r <= radius; r += 3) {
             for (int i = 0; i < 8; i++)
             {
                 ChunkPos start_cp = void;
                 final switch (i) {
-                case 0: start_cp = center_cp.shift!"x"(radius); break;
-                case 1: start_cp = center_cp.shift!"y"(radius); break;
-                case 2: start_cp = center_cp.shift!"z"(radius); break;
-                case 3: start_cp = center_cp.shift!"w"(radius); break;
-                case 4: start_cp = center_cp.shift!"x"(-radius); break;
-                case 5: start_cp = center_cp.shift!"y"(-radius); break;
-                case 6: start_cp = center_cp.shift!"z"(-radius); break;
-                case 7: start_cp = center_cp.shift!"w"(-radius); break;
+                case 0: start_cp = center_cp.shift!"x"(r); break;
+                case 1: start_cp = center_cp.shift!"y"(r); break;
+                case 2: start_cp = center_cp.shift!"z"(r); break;
+                case 3: start_cp = center_cp.shift!"w"(r); break;
+                case 4: start_cp = center_cp.shift!"x"(-r); break;
+                case 5: start_cp = center_cp.shift!"y"(-r); break;
+                case 6: start_cp = center_cp.shift!"z"(-r); break;
+                case 7: start_cp = center_cp.shift!"w"(-r); break;
                 }
                 if (start_cp !in loaded_chunks)
                 {
-                    load_stack ~= start_cp;
-                    break;
+                    if (!cps_to_load.push(start_cp)) {
+                        break;
+                    }
                 }
             }
-        }
-        else
-        {
-            load_stack ~= center_cp;
         }
 
 
         static ChunkPos[] newly_loaded;
         newly_loaded.unsafe_reset();
 
-        while (!load_stack.empty())
+        // TODO
+        for (int iter = 0; iter < 8; iter++)
         {
-            ChunkPos cp = load_stack.back();
-            load_stack.unsafe_popback();
+            ChunkPos cp;
+            if (!cps_to_load.pop(cp)) {
+                break;
+            }
 
             if (cp in loaded_chunks)
             {
+                iter--;
                 continue;
             }
 
@@ -160,7 +165,6 @@ class World
             //loaded_chunks.set(fetch_chunk(cp));
             loaded_chunks.fetch(cp);
             writeln("loaded ", cp);
-            debug(prof) profile_checkpoint();
 
             for (int i = 0; i < 8; i++)
             {
@@ -176,9 +180,12 @@ class World
                 case 7: new_cp = cp.shift!"w"(-1); break;
                 }
                 //writeln("try to queue ", new_cp);
-                if (distance(center_cp, new_cp) <= radius && new_cp !in loaded_chunks)
+
+                if (in_vert_sph(new_cp - center_cp, radius, HEIGHT_RATIO * radius) && new_cp !in loaded_chunks)
                 {
-                    load_stack ~= new_cp;
+                    if (!cps_to_load.push(new_cp)) {
+                        break;
+                    }
                 }
             }
         }
@@ -214,8 +221,7 @@ class World
         auto c = cp in loaded_chunks;
         // TODO
         if (c is null) {
-            load_chunks(cp.to_vec4_centered(), 1);
-            c = cp in loaded_chunks;
+            c = load_chunk(cp);
         }
         assert(c);
 
