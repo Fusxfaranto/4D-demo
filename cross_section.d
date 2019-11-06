@@ -25,7 +25,7 @@ private {
 
 // TODO there is still allocations (and therefore GC) happening in this function at steady state.  array literals are probably the culprit
 
-void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[] objects, float render_radius, bool cube_culling,
+void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[] objects, float render_radius, float render_height, bool cube_culling,
                             Vec4 base_pos, Vec4 up, Vec4 front, Vec4 normal, Vec4 right)
 {
     objects.unsafe_reset();
@@ -64,6 +64,7 @@ void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[
         processed_cps ~= cp;
 
         if (ChunkGLData* p = c.get_gl_data()) {
+            dwritef!"cross"("selecting cp %s", cp);
             *gl_data_p++ = p;
         }
     }
@@ -109,7 +110,7 @@ void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[
             }
 
             //if (rel_center.l1_norm() > render_radius)
-            if (!rel_center.in_vert_sph(render_radius, world.HEIGHT_RATIO * render_radius))
+            if (!rel_center.in_vert_sph(render_radius, render_height))
             {
                 continue;
             }
@@ -138,6 +139,7 @@ void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[
     }
 
     *gl_data_p++ = null;
+    dwritef!"cross"("");
 
     processed_cps.unsafe_reset();
 

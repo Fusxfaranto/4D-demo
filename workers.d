@@ -1,7 +1,13 @@
 import core.atomic : atomicLoad, atomicStore, cas;
+import core.thread : Thread;
+import std.datetime : dur;
+import std.process : thisThreadID;
 
-import chunk;
+public import std.parallelism : totalCPUs;
+
 import util;
+
+shared bool do_close = false;
 
 
 // bool atomic_inc_mod(T)(shared(T)* loc, const shared(T)* end, T modulus) {
@@ -96,7 +102,7 @@ version(none) {
         }
 
         private S[] storage;
-        private int first = -1;
+        private int first = int.min;
 
         this(int n) {
             storage = new S[n];
@@ -132,7 +138,7 @@ version(none) {
             bool cas_succeed;
             do {
                 old_first = atomicLoad(first);
-                if (old_first == -1) {
+                if (old_first == int.min) {
                     return false;
                 }
                 int next = atomicLoad(storage[old_first].next);
@@ -148,6 +154,53 @@ version(none) {
 
 }
 
-//alias ChunkPosQueue = LockFreeQueue!ChunkPos;
-alias ChunkPosStack = LockFreeStack!ChunkPos;
-ChunkPosStack cps_to_load = ChunkPosStack(4096);
+unittest {
+    enum N = 4;
+    LockFreeStack!int s = LockFreeStack!int(N);
+    assert(s.storage.length == N);
+    assert(s.first == int.min);
+    int r = -1;
+    for (int i = 0; i < N; i++) {
+        assert(s.push(i));
+        assert(s.first == i);
+    }
+    assert(!s.push(-1));
+    for (int i = N - 1; i >= 0; i--) {
+        assert(s.pop(r));
+        assert(r == i);
+    }
+
+    assert(!s.pop(r));
+}
+
+
+struct WorkerGroup {
+    Thread[] threads;
+
+    this(size_t n, void delegate() f) {
+        auto worker_f = delegate void() {
+            for (int iter = 0;; iter++) {
+                dwritef!"worker"("iter %s", iter);
+                f();
+                if (atomicLoad(do_close)) {
+                    return;
+                }
+                //Thread.sleep(dur!"msecs"(10));
+                Thread.yield();
+            }
+        };
+        threads.reserve(n);
+        for (size_t i = 0; i < n; i++) {
+            threads ~= new Thread(worker_f);
+            //threads[i].isDaemon = true;
+            threads[i].start();
+            threads[i].priority = Thread.PRIORITY_MIN;
+        }
+    }
+
+    void join() {
+        foreach (ref t; threads) {
+            t.join();
+        }
+    }
+}

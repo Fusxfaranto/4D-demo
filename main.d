@@ -1,5 +1,6 @@
 
-import std.stdio : writeln;
+import core.atomic : atomicLoad, atomicStore;
+import core.thread : Thread;
 import std.conv : to;
 import std.math : floor, PI, sin, cos, acos, sgn, abs;
 import std.datetime : to, TickDuration;
@@ -16,6 +17,7 @@ import shapes;
 import chunk;
 import cross_section;
 import world;
+import workers;
 
 
 __gshared World w = null;
@@ -51,6 +53,7 @@ enum TextDisplay
     NONE,
     BLOCK,
     POS,
+    CHUNK,
 }
 TextDisplay text_display;
 string[] scratch_strings;
@@ -58,8 +61,6 @@ string[] scratch_strings;
 //Mat4 test_rot_mat;
 //Vec4[2] test_plane = [Vec4(0.5, 0.5, 0.5, 0.5), Vec4(-0.5, -0.5, 0.5, 0.5)];
 //float test_angle = 0;
-
-bool do_close = false;
 
 
 void main()
@@ -75,10 +76,17 @@ void main()
     // scope(exit) GC.enable();
 
 
+    cast(void)readable_tid();
+
     Vec3 compass_base_ = Vec3(0, 0, 0);
     compass_base = compass_base_.data();
 
+    load_params.set(LoadParams(Vec4(0, 0, 0, 0), 0, 0));
     w = new World;
+    scope(exit) {
+        atomicStore(do_close, true);
+        w.workers.join();
+    }
 
 /*
   w.scene ~= tesseract(Vec4(-30, -30, -30, -30), Vec4(60, 60, 60, 60));
@@ -142,7 +150,7 @@ void main()
     float[30] fpss;
     debug(prof) sw.start();
 
-    while (!glfwWindowShouldClose(window) && !do_close)
+    while (!glfwWindowShouldClose(window) && !atomicLoad(do_close))
     {
         debug(prof) writeln("tick start");
         debug(prof) sw.reset();
@@ -226,6 +234,18 @@ void main()
                        pd.pos.x, pd.pos.y, pd.pos.z, pd.pos.w, pd.pos.magnitude()).ptr,
                 ];
             break;
+
+        case TextDisplay.CHUNK: {
+            ChunkPos cp = ChunkPos(pd.pos);
+            auto c = cp in w.loaded_chunks;
+            if (c) {
+                screen_text_data[1].a = [
+                    format("%s\0", cp).ptr,
+                    format("%s\0", c.get_state()).ptr,
+                    ];
+            }
+            break;
+        }
         }
         scratch_strings.unsafe_reset();
         debug(prof) profile_checkpoint();
@@ -253,9 +273,13 @@ void main()
         compass = compass_.data();
         debug(prof) profile_checkpoint();
 
+        //assert(0);
         float render_radius = 56;
-        w.load_chunks(pd.pos, cast(int)(render_radius / CHUNK_SIZE) + 2);
-        //w.load_chunks(pd.pos, 70 / CHUNK_SIZE);
+        float render_height = render_radius * 0.6;
+        int chunk_radius = cast(int)(render_radius / CHUNK_SIZE) + 2;
+        int chunk_height = cast(int)(render_height / CHUNK_SIZE) + 2;
+        load_params.set(LoadParams(pd.pos, chunk_radius, chunk_height));
+        //w.load_chunks(load_params.get());
 
         //scratch_strings ~= to!string(w.loaded_chunks.length);
         //scratch_strings ~= to!string(coords_to_chunkpos(pd.pos));
@@ -359,7 +383,7 @@ void main()
                 cuboid_uniforms_vertical.view = view_mat.data();
                 cuboid_uniforms_vertical.projection = projection_mat.data();
             }
-            generate_cross_section(w, &cuboid_data_vertical[0], vertical_objects, render_radius, cube_culling,
+            generate_cross_section(w, &cuboid_data_vertical[0], vertical_objects, render_radius, render_height, cube_culling,
                                    vert_pos, flat_normal, flat_front, GLOBAL_UP, flat_right);
             debug(prof) profile_checkpoint();
             goto case DisplayMode.NORMAL;
@@ -381,12 +405,13 @@ void main()
             }
 
             //scratch_strings.length = 0;
-            generate_cross_section(w, &cuboid_data[0], objects, render_radius, cube_culling,
+            generate_cross_section(w, &cuboid_data[0], objects, render_radius, render_height, cube_culling,
                                    pd.pos, pd.up, pd.front, pd.normal, char_right);
             debug(prof) profile_checkpoint();
         }
         }
 
+        w.sync_assign_chunk_gl_data();
         render();
         debug(prof) profile_checkpoint();
 
@@ -591,7 +616,7 @@ extern (C) void key_callback(GLFWwindow* window, int key, int scancode, int acti
 
     case GLFWKey.GLFW_KEY_ESCAPE:
     {
-        do_close = true;
+        atomicStore(do_close, true);
         break;
     }
 

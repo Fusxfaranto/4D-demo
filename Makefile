@@ -26,6 +26,8 @@ DFLAGS := -m64 -g -c -O
 DFLAGS += # -debug=prof # -profile=gc
 #LDFLAGS := -Llib -lm -lSOIL -lGLEW -lglfw -lGL
 
+DFLAGS += -unittest
+
 LDFLAGS := -L=-Llib
 LDFLAGS += -L=-lm
 LDFLAGS += -L=-lSOIL

@@ -9,6 +9,7 @@ import core.memory : GC;
 
 import matrix;
 import render_bindings;
+import workers;
 import world_gen;
 import util;
 
@@ -202,6 +203,9 @@ enum ChunkDataState {
 }
 
 
+alias ChunkPosStack = LockFreeStack!ChunkPos;
+shared ChunkPosStack assign_chunk_gl_data_stack = ChunkPosStack(4096);
+
 struct Chunk
 {
     @disable this(this);
@@ -209,7 +213,10 @@ struct Chunk
     private ChunkPos loc = ChunkPos.INVALID;
 
     private ChunkData* data;
+
     private ChunkGLData* gl_data;
+    private float[] vert_data;
+    private bool awaiting_gl_write = false;
 
     private ubyte occludes_side_b;
 
@@ -345,8 +352,11 @@ struct Chunk
                 FILLED,
                 }
 
-        static float[] vert_data;
-        vert_data.unsafe_reset();
+        if (awaiting_gl_write) {
+            return;
+        }
+
+        assert(vert_data.length == 0);
 
         void process_blockoid(int x, int y, int z, int w, int x_len, int y_len, int z_len, int w_len) {
             Vec4 blockoid_pos = Vec4(x, y, z, w) + loc.to_vec4();
@@ -617,7 +627,20 @@ struct Chunk
             assert(data.data[next_maybe_unfilled - 1] == data.data[first_unfilled]);
         }
 
+        awaiting_gl_write = true;
+        bool res = assign_chunk_gl_data_stack.push(loc);
+        assert(res); // TODO
+
+        dwritef!"chunk"("async gl data %s, num %s", loc, vert_data.length / 8);
+    }
+
+    void sync_assign_chunk_gl_data() {
+        assert(readable_tid() == 0);
+        assert(awaiting_gl_write == true);
+        dwritef!"chunk"("sync gl data %s, num %s", loc, vert_data.length / 8);
         assign_chunk_gl_data(&gl_data, vert_data.ptr, cast(int)(vert_data.length));
+        vert_data.unsafe_reset();
+        awaiting_gl_write = false;
     }
 
     // TODO is there a more threading-aware way to do this?
@@ -627,7 +650,10 @@ struct Chunk
             assert(0);
 
         case ChunkDataState.LOADED:
-            assert(gl_data);
+            //assert(gl_data);
+            if (gl_data is null) {
+                dwritef!"chunk"("WARN returning null gl_data at %s", loc);
+            }
             return gl_data;
 
         case ChunkDataState.EMPTY:
@@ -654,8 +680,13 @@ struct Chunk
 
         final switch (state) {
         case ChunkDataState.INVALID:
-        case ChunkDataState.OCCLUDED_UNLOADED: // TODO
             assert(0);
+
+        case ChunkDataState.OCCLUDED_UNLOADED:
+            dwritef(
+                "WARN trying to get block from occluded chunk %s, returning nothing",
+                loc);
+            return BlockType.NONE;// TODO
 
         case ChunkDataState.EMPTY:
             return BlockType.NONE;
@@ -694,11 +725,12 @@ int chunkpos_l1_dist(ChunkPos a, ChunkPos b)
 }
 
 
-
-Chunk fetch_chunk(ChunkPos loc)
+// TODO properly write over, don't just leak everything
+void fetch_chunk(ref Chunk c, ChunkPos loc)
 {
     debug(prof) profile_checkpoint();
-    Chunk c;
+
+    c.lock.assert_locked();
 
     //c.update_gl_data(loc);
 
@@ -724,7 +756,8 @@ Chunk fetch_chunk(ChunkPos loc)
             foreach (z; 0..CHUNK_SIZE) {
                 foreach (w; 0..CHUNK_SIZE) {
                     Vec4 p = base_p_height + Vec4(x, 0, z, w);
-                    double f = octaves!memo_perlin3(p, ois);
+                    //double f = octaves!memo_perlin3(p, ois);
+                    double f = octaves!perlin3(p, ois);
                     float height = f - 30;
                     int max_y = min(cast(int)(height - base_p.y), CHUNK_SIZE);
                     for (int y = 0; y < max_y; y++) {
@@ -735,13 +768,9 @@ Chunk fetch_chunk(ChunkPos loc)
         }
     }
 
-    // TODO something better than this?
-    c.lock.claim();
     c.update_from_internal();
 
-    writeln(c.state);
-
-    return c;
+    //writeln(c.state);
 }
 
 
@@ -769,7 +798,10 @@ struct ChunkIndex {
 
     LockedChunkP opBinaryRight(string s : "in")(auto ref ChunkPos cp) {
         Chunk* c = index(cp);
+        assert(cast(void*)&data[0] <= cast(void*)c && cast(void*)&data[$-1] >= cast(void*)c);
+        dwritef!"lock"("attempting to lock %s (%s)", c, cp);
         auto l = c.lock();
+        dwritef!"lock"("stored loc %s", c.loc);
         return c.loc == cp ?
             LockedChunkP(c, l) :
             LockedChunkP(null);
@@ -791,12 +823,13 @@ struct ChunkIndex {
     // TODO this is gross, implement move semantics or something
     LockedChunkP fetch()(auto ref ChunkPos cp) {
         Chunk* old_c = index(cp);
+        dwritef!"chunk"("fetching %s (%s)", old_c, cp);
         auto l = old_c.lock();
 
         // TODO this leaks overwritten chunks (gl data etc)
         assert(old_c.state == ChunkDataState.INVALID);
 
-        *old_c = fetch_chunk(cp);
+        fetch_chunk(*old_c, cp);
         return LockedChunkP(old_c, l);
     }
 

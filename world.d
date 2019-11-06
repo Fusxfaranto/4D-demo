@@ -6,6 +6,7 @@ import matrix;
 import shapes;
 import chunk;
 import cross_section;
+import render_bindings;
 import world_gen;
 import workers;
 
@@ -18,6 +19,16 @@ struct BlockFace {
 }
 
 
+struct LoadParams {
+    Vec4 center;
+    int chunk_radius;
+    int chunk_height;
+}
+shared Locked!LoadParams load_params;
+
+
+ChunkPosStack cps_to_load = ChunkPosStack(4096);
+
 
 class World
 {
@@ -27,9 +38,15 @@ class World
     ChunkIndex loaded_chunks;
     //ChunkData[] chunk_data_pool;
 
+    WorkerGroup workers;
+
     this() {
         // TODO don't hardcode
         loaded_chunks = ChunkIndex(512 / CHUNK_SIZE);
+
+        workers = WorkerGroup(totalCPUs, {
+                load_chunks(load_params.get());
+            });
     }
 
 
@@ -57,14 +74,13 @@ class World
             case 7: adjacent_cp = cp.shift!"w"(-1); break;
             }
 
-            if_loaded!update_chunk_from_surroundings(adjacent_cp);
+            // TODO this very overcomputes
+            update_chunk_from_surroundings(adjacent_cp);
         }
     }
 
 
-    private void update_chunk_from_surroundings(ref Chunk c) {
-        ChunkPos loc = c.get_loc();
-
+    private void update_chunk_from_surroundings(ChunkPos loc) {
         ubyte occluded_from = 0;
         for (int i = 0; i < 8; i++)
         {
@@ -88,6 +104,12 @@ class World
             }
         }
 
+        auto c = loc in loaded_chunks;
+        if (!c) {
+            // TODO anything better to do in this case?
+            return;
+        }
+
         if (occluded_from == 0xff) {
             c.unload_data!(ChunkDataState.OCCLUDED_UNLOADED)();
         } else {
@@ -95,7 +117,7 @@ class World
             if (c.get_state() == ChunkDataState.OCCLUDED_UNLOADED) {
                 assert(c.get_gl_data() is null);
                 // TODO does this leak stuff?
-                c = fetch_chunk(loc);
+                fetch_chunk(*c, loc);
             }
 
             if (c.get_state() != ChunkDataState.EMPTY) {
@@ -106,21 +128,19 @@ class World
 
     // TODO something better
     auto load_chunk(ChunkPos cp) {
-        {
-            auto c = loaded_chunks.fetch(cp);
-            update_chunk_from_surroundings(*c);
-        }
+        loaded_chunks.fetch(cp);
+        update_chunk_from_surroundings(cp);
         update_surrounding_chunks(cp);
         return cp in loaded_chunks;
     }
 
-    enum HEIGHT_RATIO = 0.6;
-    void load_chunks(Vec4 center, int radius)
+    void load_chunks(LoadParams params)
     {
-        ChunkPos center_cp = ChunkPos(center);
+        ChunkPos center_cp = ChunkPos(params.center);
         //if (center_cp in loaded_chunks)
         // TODO
-        for (int r = 3 + radius % 3; r <= radius; r += 3) {
+    queue_chunks_outer:
+        for (int r = 1;;) {
             for (int i = 0; i < 8; i++)
             {
                 ChunkPos start_cp = void;
@@ -137,10 +157,15 @@ class World
                 if (start_cp !in loaded_chunks)
                 {
                     if (!cps_to_load.push(start_cp)) {
-                        break;
+                        break queue_chunks_outer;
                     }
+                    break queue_chunks_outer; // TODO?
                 }
             }
+            if (r == params.chunk_radius) {
+                break;
+            }
+            r = min(r + 2, params.chunk_radius);
         }
 
 
@@ -148,7 +173,7 @@ class World
         newly_loaded.unsafe_reset();
 
         // TODO
-        for (int iter = 0; iter < 8; iter++)
+        for (int iter = 0; iter < 16; iter++)
         {
             ChunkPos cp;
             if (!cps_to_load.pop(cp)) {
@@ -181,7 +206,7 @@ class World
                 }
                 //writeln("try to queue ", new_cp);
 
-                if (in_vert_sph(new_cp - center_cp, radius, HEIGHT_RATIO * radius) && new_cp !in loaded_chunks)
+                if (in_vert_sph(new_cp - center_cp, params.chunk_radius, params.chunk_height) && new_cp !in loaded_chunks)
                 {
                     if (!cps_to_load.push(new_cp)) {
                         break;
@@ -193,7 +218,7 @@ class World
         // TODO i think this basically works but it overprocesses
         // should reuse processing_status?
         foreach (ref cp; newly_loaded) {
-            if_loaded!update_chunk_from_surroundings(cp);
+            update_chunk_from_surroundings(cp);
 
             for (int i = 0; i < 8; i++)
             {
@@ -209,8 +234,19 @@ class World
                 case 7: adjacent_cp = cp.shift!"w"(-1); break;
                 }
 
-                if_loaded!update_chunk_from_surroundings(adjacent_cp);
+                update_chunk_from_surroundings(adjacent_cp);
             }
+        }
+    }
+
+
+    void sync_assign_chunk_gl_data() {
+        assert(readable_tid() == 0); // TODO
+
+        ChunkPos cp;
+        while (assign_chunk_gl_data_stack.pop(cp)) {
+            auto c = cp in loaded_chunks;
+            c.sync_assign_chunk_gl_data();
         }
     }
 
@@ -241,9 +277,9 @@ class World
             c.set_block(rel_p, t);
 
             c.update_from_internal();
-            update_chunk_from_surroundings(*c);
         }
 
+        update_chunk_from_surroundings(cp);
         update_surrounding_chunks(cp);
     }
 

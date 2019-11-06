@@ -4,6 +4,7 @@ public import std.stdio : write, writeln, writef, writefln;
 public import std.typecons : Tuple, tuple;
 
 import core.atomic : atomicLoad, atomicStore, cas;
+import core.sync.mutex : Mutex;
 import std.datetime.stopwatch : StopWatch;
 import std.datetime : to, TickDuration;
 import std.process : thisThreadID;
@@ -54,6 +55,40 @@ string format(A...)(string fmt, A args)
     writer.formattedWrite(fmt, args);
 
     return writer.data;
+}
+
+private shared int[ulong] readable_tid_map;
+private shared Mutex readable_tid_m;
+int readable_tid(ulong tid) {
+    readable_tid_m.lock_nothrow();
+
+    int r;
+    if (auto p = tid in readable_tid_map) {
+        r = *p;
+    } else {
+        r = cast(int)(readable_tid_map.length);
+        readable_tid_map[tid] = r;
+    }
+
+    readable_tid_m.unlock_nothrow();
+
+    return r;
+}
+int readable_tid() {
+    return readable_tid(thisThreadID());
+}
+
+private shared Mutex dwrite_m;
+void dwritef(string t = "always", A...)(auto ref string fmt, auto ref A args) {
+    static if (
+        //t != "lock" &&
+        t != "cross" &&
+        true) {
+        dwrite_m.lock_nothrow();
+        writef("tid %s\t", readable_tid());
+        writefln(fmt, args);
+        dwrite_m.unlock_nothrow();
+    }
 }
 
 
@@ -109,8 +144,8 @@ shared struct SpinLock {
     private struct Locker {
         SpinLock* l;
         ~this() {
-            //writefln("unlock: %s", &l.is_locked);
             if (l) {
+                dwritef!"lock"("unlock: %s", &l.is_locked);
                 l.assert_locked();
                 atomicStore(l.is_locked, false);
             }
@@ -129,27 +164,38 @@ shared struct SpinLock {
     private ulong locking_thread_id;
 
     Locker opCall() {
-        //writefln("lock: %s", &is_locked);
-        assert(!atomicLoad(is_locked) || atomicLoad(locking_thread_id) != thisThreadID());
-        do {} while (cas(&is_locked, false, true));
-        atomicStore(locking_thread_id, thisThreadID());
+        ulong tid = thisThreadID();
+        {
+            //writeln(&is_locked);
+            bool nl = !atomicLoad(is_locked);
+            bool diff_tid = atomicLoad(locking_thread_id) != tid;
+            assert(nl || diff_tid);
+        }
+        do {
+            dwritef!"lock"("try to lock: %s", &is_locked);
+        } while (!cas(&is_locked, false, true));
+        atomicStore(locking_thread_id, tid);
+        dwritef!"lock"("lock succeess: %s", &is_locked);
         return Locker(&this);
     }
 
-    // TODO i'd prefer to not have this
-    void claim() {
-        //writefln("claim: %s", &is_locked);
-        assert_unlocked();
-        atomicStore(locking_thread_id, thisThreadID());
-        atomicStore(is_locked, true);
+    version(none) {
+        // TODO i'd prefer to not have this
+        void claim() {
+            dwritef!"lock"("claim: %s", &is_locked);
+            assert_unlocked();
+            ulong tid = thisThreadID();
+            atomicStore(locking_thread_id, tid);
+            atomicStore(is_locked, true);
+        }
     }
 
     void assert_locked() const {
-        assert(atomicLoad(is_locked));
+        assert(atomicLoad(is_locked), format("%s %s", readable_tid(), &is_locked));
     }
 
     void assert_unlocked() const {
-        assert(!atomicLoad(is_locked));
+        assert(!atomicLoad(is_locked), format("%s %s", readable_tid(), &is_locked));
     }
 
     struct LockedP(T, string field = "lock") {
@@ -159,15 +205,38 @@ shared struct SpinLock {
         Locker locker;
 
         this(T* p_) {
+            p = p_;
             assert(p is null);
+            locker = Locker(null);
         }
 
         this(T* p_, ref Locker l) {
             p = p_;
-            assert(p);
+            assert(p !is null);
+            assert(l.l !is null);
             locker = l.move();
         }
 
         @disable this(this);
     }
+}
+
+shared struct Locked(T) {
+    SpinLock lock;
+    T t;
+
+    T get() {
+        auto l = lock();
+        return t;
+    }
+
+    void set(T t_) {
+        auto l = lock();
+        t = t_;
+    }
+}
+
+shared static this() {
+    dwrite_m = new shared Mutex();
+    readable_tid_m = new shared Mutex();
 }
