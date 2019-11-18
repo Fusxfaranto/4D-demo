@@ -155,6 +155,8 @@ void main()
         debug(prof) writeln("tick start");
         debug(prof) sw.reset();
 
+        dwritef!"lock"("sl state %s", sl_tracker);
+
         fpss[t % fpss.length] = 1.0e9 / (TickDuration.currSystemTick() - last_time).nsecs();
         float fps = sum(fpss[]) / fpss.length;
         title_str = format("%s %s\0", fps.to!string(), extra_time.to!("usecs", long));
@@ -249,6 +251,8 @@ void main()
         }
         scratch_strings.unsafe_reset();
         debug(prof) profile_checkpoint();
+
+        scratch_strings ~= format("cps_to_load len %s", cps_to_load.length());
 
         Vec4 flat_front = (pd.front - proj(pd.front, GLOBAL_UP)).normalized();
         Vec4 flat_normal = (pd.normal - proj(pd.normal, GLOBAL_UP)).normalized();

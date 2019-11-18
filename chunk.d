@@ -229,7 +229,7 @@ struct Chunk
     }
 
     private void transition_state(ChunkDataState s) {
-        writefln("transitioning %s -> %s", state, s);
+        //writefln("transitioning %s -> %s", state, s);
         state = s;
     }
 
@@ -653,6 +653,7 @@ struct Chunk
             //assert(gl_data);
             if (gl_data is null) {
                 dwritef!"chunk"("WARN returning null gl_data at %s", loc);
+                //assert(awaiting_gl_write, format("%s", loc));
             }
             return gl_data;
 
@@ -774,8 +775,6 @@ void fetch_chunk(ref Chunk c, ChunkPos loc)
 }
 
 
-
-
 struct ChunkIndex {
     private alias LockedChunkP = SpinLock.LockedP!Chunk;
 
@@ -798,10 +797,9 @@ struct ChunkIndex {
 
     LockedChunkP opBinaryRight(string s : "in")(auto ref ChunkPos cp) {
         Chunk* c = index(cp);
-        assert(cast(void*)&data[0] <= cast(void*)c && cast(void*)&data[$-1] >= cast(void*)c);
-        dwritef!"lock"("attempting to lock %s (%s)", c, cp);
+        //dwritef!"lock"("attempting to lock %s (%s)", c, cp);
         auto l = c.lock();
-        dwritef!"lock"("stored loc %s", c.loc);
+        //dwritef!"lock"("stored loc %s", c.loc);
         return c.loc == cp ?
             LockedChunkP(c, l) :
             LockedChunkP(null);
@@ -823,7 +821,7 @@ struct ChunkIndex {
     // TODO this is gross, implement move semantics or something
     LockedChunkP fetch()(auto ref ChunkPos cp) {
         Chunk* old_c = index(cp);
-        dwritef!"chunk"("fetching %s (%s)", old_c, cp);
+        //dwritef!"chunk"("fetching %s (%s)", old_c, cp);
         auto l = old_c.lock();
 
         // TODO this leaks overwritten chunks (gl data etc)

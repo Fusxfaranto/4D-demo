@@ -27,7 +27,7 @@ struct LoadParams {
 shared Locked!LoadParams load_params;
 
 
-ChunkPosStack cps_to_load = ChunkPosStack(4096);
+ChunkPosStack cps_to_load = ChunkPosStack(1024 * 32);
 
 
 class World
@@ -134,54 +134,65 @@ class World
         return cp in loaded_chunks;
     }
 
+    // TODO really looks like workers are deadlocking somewhere
     void load_chunks(LoadParams params)
     {
-        ChunkPos center_cp = ChunkPos(params.center);
-        //if (center_cp in loaded_chunks)
-        // TODO
-    queue_chunks_outer:
-        for (int r = 1;;) {
-            for (int i = 0; i < 8; i++)
-            {
-                ChunkPos start_cp = void;
-                final switch (i) {
-                case 0: start_cp = center_cp.shift!"x"(r); break;
-                case 1: start_cp = center_cp.shift!"y"(r); break;
-                case 2: start_cp = center_cp.shift!"z"(r); break;
-                case 3: start_cp = center_cp.shift!"w"(r); break;
-                case 4: start_cp = center_cp.shift!"x"(-r); break;
-                case 5: start_cp = center_cp.shift!"y"(-r); break;
-                case 6: start_cp = center_cp.shift!"z"(-r); break;
-                case 7: start_cp = center_cp.shift!"w"(-r); break;
-                }
-                if (start_cp !in loaded_chunks)
-                {
-                    if (!cps_to_load.push(start_cp)) {
-                        break queue_chunks_outer;
-                    }
-                    break queue_chunks_outer; // TODO?
-                }
-            }
-            if (r == params.chunk_radius) {
-                break;
-            }
-            r = min(r + 2, params.chunk_radius);
-        }
+        static load_count = 0;
+        dwritef!"chunk"("load count %s", load_count);
 
+        ChunkPos center_cp = ChunkPos(params.center);
+
+        // TODO tweak
+        bool should_queue_chunks = cps_to_load.empty();
+        if (should_queue_chunks) {
+        queue_chunks_outer:
+            for (int r = 1;;) {
+                for (int i = 0; i < 8; i++)
+                {
+                    ChunkPos start_cp = void;
+                    final switch (i) {
+                    case 0: start_cp = center_cp.shift!"x"(r); break;
+                    case 1: start_cp = center_cp.shift!"y"(r); break;
+                    case 2: start_cp = center_cp.shift!"z"(r); break;
+                    case 3: start_cp = center_cp.shift!"w"(r); break;
+                    case 4: start_cp = center_cp.shift!"x"(-r); break;
+                    case 5: start_cp = center_cp.shift!"y"(-r); break;
+                    case 6: start_cp = center_cp.shift!"z"(-r); break;
+                    case 7: start_cp = center_cp.shift!"w"(-r); break;
+                    }
+                    if (start_cp !in loaded_chunks)
+                    {
+                        if (!cps_to_load.push(start_cp)) {
+                            break queue_chunks_outer;
+                        }
+                        break queue_chunks_outer; // TODO?
+                    }
+                }
+                if (r == params.chunk_radius) {
+                    // TODO sleep or something?
+                    // should probably come up with a better
+                    // way to yield when workload is low
+                    break;
+                }
+                r = min(r + 2, params.chunk_radius);
+                // TODO this should be totally fine, but for some
+                // reason results in no chunks being loaded
+                // (when priority is min on worker threads?)
+                // r++;
+            }
+        }
 
         static ChunkPos[] newly_loaded;
         newly_loaded.unsafe_reset();
 
-        // TODO
-        for (int iter = 0; iter < 16; iter++)
-        {
+        // TODO tweak?
+        for (int iter = 0; iter < 64; iter++) {
             ChunkPos cp;
             if (!cps_to_load.pop(cp)) {
                 break;
             }
 
-            if (cp in loaded_chunks)
-            {
+            if (cp in loaded_chunks) {
                 iter--;
                 continue;
             }
@@ -189,10 +200,10 @@ class World
             newly_loaded ~= cp;
             //loaded_chunks.set(fetch_chunk(cp));
             loaded_chunks.fetch(cp);
-            writeln("loaded ", cp);
+            load_count++;
+            //writeln("loaded ", cp);
 
-            for (int i = 0; i < 8; i++)
-            {
+            for (int i = 0; i < 8; i++) {
                 ChunkPos new_cp = void;
                 final switch (i) {
                 case 0: new_cp = cp.shift!"x"(1); break;
@@ -206,9 +217,9 @@ class World
                 }
                 //writeln("try to queue ", new_cp);
 
-                if (in_vert_sph(new_cp - center_cp, params.chunk_radius, params.chunk_height) && new_cp !in loaded_chunks)
-                {
+                if (in_vert_sph(new_cp - center_cp, params.chunk_radius, params.chunk_height) && new_cp !in loaded_chunks) {
                     if (!cps_to_load.push(new_cp)) {
+                        // TODO when cps_to_load is full (which is often), this can result in chunks never getting loaded (without further movement)
                         break;
                     }
                 }

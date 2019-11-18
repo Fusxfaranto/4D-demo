@@ -83,6 +83,7 @@ void dwritef(string t = "always", A...)(auto ref string fmt, auto ref A args) {
     static if (
         //t != "lock" &&
         t != "cross" &&
+        t != "chunk" &&
         true) {
         dwrite_m.lock_nothrow();
         writef("tid %s\t", readable_tid());
@@ -138,15 +139,19 @@ T reinterpret(T, U)(auto ref U u) if (T.sizeof) {
     return *cast(T*)(&u);
 }
 
-
+enum MAX_NUM_THREADS = 16;
+shared (SpinLock*)[MAX_NUM_THREADS] sl_tracker;
 
 shared struct SpinLock {
     private struct Locker {
         SpinLock* l;
         ~this() {
             if (l) {
-                dwritef!"lock"("unlock: %s", &l.is_locked);
+                //dwritef!"lock"("unlock: %s", &l.is_locked);
                 l.assert_locked();
+                atomicStore(l.locking_thread_id, 0);
+                assert(atomicLoad(sl_tracker[readable_tid()]) == l);
+                atomicStore(sl_tracker[readable_tid()], null);
                 atomicStore(l.is_locked, false);
             }
         }
@@ -171,23 +176,19 @@ shared struct SpinLock {
             bool diff_tid = atomicLoad(locking_thread_id) != tid;
             assert(nl || diff_tid);
         }
-        do {
-            dwritef!"lock"("try to lock: %s", &is_locked);
-        } while (!cas(&is_locked, false, true));
-        atomicStore(locking_thread_id, tid);
-        dwritef!"lock"("lock succeess: %s", &is_locked);
-        return Locker(&this);
-    }
+        bool spinning = false;
 
-    version(none) {
-        // TODO i'd prefer to not have this
-        void claim() {
-            dwritef!"lock"("claim: %s", &is_locked);
-            assert_unlocked();
-            ulong tid = thisThreadID();
-            atomicStore(locking_thread_id, tid);
-            atomicStore(is_locked, true);
+        while (!cas(&is_locked, false, true)) {
+            if (!spinning) {
+                //dwritef!"lock"("waiting on lock: %s", &is_locked);
+            }
+            spinning = true;
         }
+        atomicStore(locking_thread_id, tid);
+        assert(atomicLoad(sl_tracker[readable_tid()]) is null);
+        atomicStore(sl_tracker[readable_tid()], &this);
+        //dwritef!"lock"("lock succeess: %s", &is_locked);
+        return Locker(&this);
     }
 
     void assert_locked() const {
@@ -234,6 +235,23 @@ shared struct Locked(T) {
         auto l = lock();
         t = t_;
     }
+}
+
+
+// TODO workaround until i get a
+// phobos version with atomicFetchAdd/Sub
+T atomicFetchAdd(T)(shared ref T n, T a) {
+    bool cas_succeed;
+    T old_n;
+    do {
+        old_n = atomicLoad(n);
+        T new_n = old_n + a;
+        cas_succeed = cas(&n, old_n, new_n);
+    } while (!cas_succeed);
+    return old_n;
+}
+T atomicFetchSub(T)(shared ref T n, T a) {
+    return atomicFetchAdd(n, -a);
 }
 
 shared static this() {
