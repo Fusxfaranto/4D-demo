@@ -134,13 +134,13 @@ struct Watchdogs {
                     for (size_t i = 0; i < n; i++) {
                         auto l = sls[i]();
                         auto t = sws[i].peek();
-                        dwritef!"watchdog"("peek %s at %s", i, t);
-                        if (t > dur!"msecs"(2000)) {
+                        //dwritef!"watchdog"("peek %s at %s", i, t);
+                        if (t > dur!"msecs"(1000)) {
                             dwritef("watchdog bit %s, aborting", i);
-                            //abort();
+                            abort();
                         }
                     }
-                    Thread.sleep(dur!"msecs"(400));
+                    Thread.sleep(dur!"msecs"(200));
 
                     if (atomicLoad(do_close)) {
                         return;
@@ -162,17 +162,25 @@ struct WorkerGroup {
 
     private auto make_delegate(size_t i, void delegate() f) {
         return delegate void() {
-            for (int iter = 0;; iter++) {
-                //dwritef!"worker"("iter %s", iter);
-                watchdogs.pet(i);
-                f();
-                if (atomicLoad(do_close)) {
-                    return;
+            int iter = 0;
+            try {
+                for (;;) {
+                    //if (iter < 10) dwritef!"worker"("iter %s", iter);
+                    watchdogs.pet(i);
+                    f();
+                    if (atomicLoad(do_close)) {
+                        dwritef!"worker"("closing");
+                        return;
+                    }
+                    //Thread.sleep(dur!"msecs"(10));
+                    Thread.yield();
+
+                    iter++;
                 }
-                //Thread.sleep(dur!"msecs"(10));
-                Thread.yield();
+            } catch (Throwable e) {
+                dwritef!"worker"("exception in %s, iter %s:\n%s", i, iter, e);
+                abort();
             }
-            assert(0);
         };
     }
 

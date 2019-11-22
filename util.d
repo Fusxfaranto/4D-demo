@@ -59,6 +59,7 @@ string format(A...)(string fmt, A args)
 
 private shared int[ulong] readable_tid_map;
 private shared Mutex readable_tid_m;
+private static int readable_tid_tl = -1;
 int readable_tid(ulong tid) {
     readable_tid_m.lock_nothrow();
 
@@ -75,7 +76,10 @@ int readable_tid(ulong tid) {
     return r;
 }
 int readable_tid() {
-    return readable_tid(thisThreadID());
+    if (readable_tid_tl == -1) {
+        readable_tid_tl = readable_tid(thisThreadID());
+    }
+    return readable_tid_tl;
 }
 
 private shared Mutex dwrite_m;
@@ -139,7 +143,7 @@ T reinterpret(T, U)(auto ref U u) if (T.sizeof) {
     return *cast(T*)(&u);
 }
 
-enum MAX_NUM_THREADS = 16;
+enum MAX_NUM_THREADS = 6;
 shared (SpinLock*)[MAX_NUM_THREADS] sl_tracker;
 
 shared struct SpinLock {

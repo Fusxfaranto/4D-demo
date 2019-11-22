@@ -1,5 +1,6 @@
 
 import core.atomic : atomicLoad, atomicStore;
+import core.memory : GC;
 import core.thread : Thread;
 import std.conv : to;
 import std.math : floor, PI, sin, cos, acos, sgn, abs;
@@ -155,7 +156,7 @@ void main()
         debug(prof) writeln("tick start");
         debug(prof) sw.reset();
 
-        dwritef!"lock"("sl state %s", sl_tracker);
+        //dwritef!"lock"("sl state %s", sl_tracker);
 
         fpss[t % fpss.length] = 1.0e9 / (TickDuration.currSystemTick() - last_time).nsecs();
         float fps = sum(fpss[]) / fpss.length;

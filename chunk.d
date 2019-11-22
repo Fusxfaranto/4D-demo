@@ -259,7 +259,7 @@ struct Chunk
             assert(0, format("%s", state));
 
         case ChunkDataState.EMPTY:
-            writefln("%s unloading from empty, is that ok??", loc);
+            //dwritef("%s unloading from empty, is that ok??", loc);
             return;
 
         case ChunkDataState.OCCLUDED_UNLOADED:
@@ -823,6 +823,11 @@ struct ChunkIndex {
         Chunk* old_c = index(cp);
         //dwritef!"chunk"("fetching %s (%s)", old_c, cp);
         auto l = old_c.lock();
+
+        if (old_c.state != ChunkDataState.INVALID && old_c.loc == cp) {
+            dwritef!"chunk"("trying to fetch loaded chunk at %s", cp);
+            return LockedChunkP(old_c, l);
+        }
 
         // TODO this leaks overwritten chunks (gl data etc)
         assert(old_c.state == ChunkDataState.INVALID);
