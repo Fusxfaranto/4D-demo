@@ -64,7 +64,7 @@ void generate_cross_section(ref World world, ChunkGLData** gl_data_p, ref float[
         processed_cps ~= cp;
 
         if (ChunkGLData* p = c.get_gl_data()) {
-            dwritef!"cross"("selecting cp %s", cp);
+            dwritef!"cross"("selecting cp %s (%s)", cp, p);
             *gl_data_p++ = p;
         }
     }

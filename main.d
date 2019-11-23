@@ -278,6 +278,8 @@ void main()
         compass = compass_.data();
         debug(prof) profile_checkpoint();
 
+        w.sync_assign_chunk_gl_data();
+
         //assert(0);
         float render_radius = 56;
         float render_height = render_radius * 0.6;
@@ -416,7 +418,6 @@ void main()
         }
         }
 
-        w.sync_assign_chunk_gl_data();
         render();
         debug(prof) profile_checkpoint();
 

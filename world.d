@@ -44,7 +44,8 @@ class World
         // TODO don't hardcode
         loaded_chunks = ChunkIndex(512 / CHUNK_SIZE);
 
-        workers = WorkerGroup(totalCPUs, {
+        auto num_workers = totalCPUs - 1;
+        workers = WorkerGroup(num_workers, {
                 load_chunks(load_params.get());
             });
     }
@@ -134,7 +135,6 @@ class World
         return cp in loaded_chunks;
     }
 
-    // TODO really looks like workers are deadlocking somewhere
     void load_chunks(LoadParams params)
     {
         static load_count = 0;

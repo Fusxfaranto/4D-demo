@@ -4,6 +4,15 @@
 #include "util.h"
 #include "text.h"
 
+#define PRINT_IF_GL_ERR(...)                                    \
+    do {                                                        \
+        int __err = glGetError();                               \
+        if (__err != 0) {                                       \
+            printf("gl error at %d: %d\n", __LINE__, __err);    \
+            printf(__VA_ARGS__);                                \
+            printf("\n");                                       \
+        }                                                       \
+    } while (0)
 
 
 typedef struct
@@ -409,6 +418,8 @@ void render_objects(FloatDArray os, GLuint VAO, GLuint VBO)
 void free_chunk_gl_data(ChunkGLData *data) {
     assert(data);
 
+    //printf("freeing ChunkGLData %p\n", (void*)data);
+
     free(data);
         
     glDeleteBuffers(1, &data->VBO);
@@ -451,6 +462,7 @@ void assign_chunk_gl_data(ChunkGLData **data_p, float* cube_corners, int cube_co
     //printf("%p\twrote %d\n", (void*)data, cube_corners_len);
 
     glBufferSubData(GL_ARRAY_BUFFER, 0, cube_corners_len * sizeof(float), cube_corners);
+    PRINT_IF_GL_ERR("%d", cube_corners_len);
     data->len = cube_corners_len / 8;
     
     /* for (int j = 0; j < data->len; j++) { */
@@ -494,7 +506,14 @@ void render_cuboids(/*const*/ ChunkGLData **data, const CuboidShaderData* unifor
         //printf("rendering %d\n", i);
         glBindVertexArray(data[i]->VAO);
         glDrawArrays(GL_POINTS, 0, data[i]->len);
-        //printf("%d\t%d\n", data[i]->VAO, data[i]->len);
+        if (i < 5) {
+            //printf("idx %d: %p %d %u %u\n", i, (void*)data[i], data[i]->VAO, data[i]->len, data[i]->capacity);
+        }
+        //fflush(stdout);
+
+        assert(glGetError() == 0);
+        PRINT_IF_GL_ERR("%d: %d\t%d\n", i, data[i]->VAO, data[i]->len);
+
     }
 }
 
