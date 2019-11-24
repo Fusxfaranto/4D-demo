@@ -5,9 +5,6 @@ in vec2 tex_coords;
 
 out vec4 color;
 
-uniform sampler2D tex1;
-uniform sampler2D tex2;
-
 void main()
 {
     color = vec4(color_f, 1.0);

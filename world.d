@@ -164,6 +164,7 @@ class World
                     if (start_cp !in loaded_chunks)
                     {
                         if (!cps_to_load.push(start_cp)) {
+                            assert(0); // TODO
                             break queue_chunks_outer;
                         }
                         break queue_chunks_outer; // TODO?
@@ -175,11 +176,7 @@ class World
                     // way to yield when workload is low
                     break;
                 }
-                r = min(r + 2, params.chunk_radius);
-                // TODO this should be totally fine, but for some
-                // reason results in no chunks being loaded
-                // (when priority is min on worker threads?)
-                // r++;
+                r++;
             }
         }
 

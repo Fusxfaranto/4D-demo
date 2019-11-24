@@ -32,6 +32,7 @@ struct PosDir {
         return r;
     }
 
+    // TODO something is not quite right here i think
     void do_intersection(BlockType block, BlockPos bp) {
         if (block.has_collision()) {
             Vec4 rel_block_pos = bp.to_vec4() - pos;

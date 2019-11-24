@@ -672,7 +672,7 @@ struct Mat4
             )");
     }
 
-    Vec4 opBinary(string op)(auto ref in Vec4 b) if (op == "*")
+    Vec4 opBinary(string op)(auto ref in Vec4 b) const if (op == "*")
     {
         return Vec4(
             xx * b.x + xy * b.y + xz * b.z + xw * b.w,
@@ -682,7 +682,7 @@ struct Mat4
             );
     }
 
-    Mat4 opBinaryRight(string op)(float a) if (op == "*")
+    Mat4 opBinaryRight(string op)(float a) const if (op == "*")
     {
         return Mat4(
             a * xx,

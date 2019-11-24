@@ -56,7 +56,7 @@ GLuint texture1, texture2;
 GLuint view_loc, projection_loc;
 GLuint main_fb;
 GLuint main_tex;
-GLuint main_rbo;
+GLuint main_rbo; // TODO do i actually use these rbos? should i??
 
 float *compass_base;
 float *compass;
@@ -67,6 +67,13 @@ GLuint compass_VAO;
 GLuint compass_shader;
 GLuint compass_fb;
 GLuint compass_tex;
+
+GLuint proj_shader;
+GLuint proj_VAO;
+GLuint proj_VBO;
+GLuint proj_fb;
+GLuint proj_tex;
+FloatDArray proj_data;
 
 
 typedef struct ChunkGLData {
@@ -103,7 +110,7 @@ GLuint vertical_fb;
 GLuint vertical_tex;
 GLuint vertical_rbo;
 
-float *view, *projection;
+float *view_f, *projection_f;
 
 Font *font;
 #define MAX_TEXTS 16
@@ -197,6 +204,7 @@ int init(void)
     CHECK_RES(create_shader(&base_shader, "vertex.glsl", NULL, "fragment.glsl"));
     CHECK_RES(create_shader(&compass_shader, "compass_vertex.glsl", NULL, "compass_fragment.glsl"));
     CHECK_RES(create_shader(&cuboid_shader, "block_vertex.glsl", "block_geometry.glsl", "block_fragment.glsl"));
+    CHECK_RES(create_shader(&proj_shader, "proj_vertex.glsl", NULL, "proj_fragment.glsl"));
     CHECK_RES(create_shader(&fb_shader, "fb_vertex.glsl", "fb_geometry.glsl", "fb_fragment.glsl"));
 
     view_loc = glGetUniformLocation(base_shader, "view");
@@ -227,6 +235,16 @@ int init(void)
 
     glGenBuffers(1, &main_VBO);
     glGenVertexArrays(1, &main_VAO);
+
+
+    glGenBuffers(1, &proj_VBO);
+    glGenVertexArrays(1, &proj_VAO);
+    glBindVertexArray(proj_VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, proj_VBO);
+    // TODO size
+    glBufferData(GL_ARRAY_BUFFER, (4096 * 8) * sizeof(float), NULL, GL_STREAM_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+    glEnableVertexAttribArray(0);
 
 
     glGenBuffers(1, &compass_VBO);
@@ -260,16 +278,6 @@ int init(void)
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    glGenFramebuffers(1, &compass_fb);
-    glBindFramebuffer(GL_FRAMEBUFFER, compass_fb);
-    glGenTextures(1, &compass_tex);
-    glBindTexture(GL_TEXTURE_2D, compass_tex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, compass_tex, 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
     glGenFramebuffers(1, &vertical_fb);
     glBindFramebuffer(GL_FRAMEBUFFER, vertical_fb);
     glGenTextures(1, &vertical_tex);
@@ -282,6 +290,26 @@ int init(void)
     glBindRenderbuffer(GL_RENDERBUFFER, vertical_rbo);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, vertical_rbo);
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glGenFramebuffers(1, &compass_fb);
+    glBindFramebuffer(GL_FRAMEBUFFER, compass_fb);
+    glGenTextures(1, &compass_tex);
+    glBindTexture(GL_TEXTURE_2D, compass_tex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, compass_tex, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glGenFramebuffers(1, &proj_fb);
+    glBindFramebuffer(GL_FRAMEBUFFER, proj_fb);
+    glGenTextures(1, &proj_tex);
+    glBindTexture(GL_TEXTURE_2D, proj_tex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, proj_tex, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 
@@ -302,10 +330,11 @@ int window_size_update(void)
 {
     glBindVertexArray(fb_rectangle_vao);
     glBindBuffer(GL_ARRAY_BUFFER, fb_rectangle_vbo);
-    float vs[4 * 3] = {
-        -1,      -1, 1, 1,       // main area
-        UNSPECF, -1, 1, UNSPECF, // compass
-        0,       -1, 1, 1,       // vertical view
+    float vs[] = {
+        -1,      -1,      1,       1,       // main area
+        UNSPECF, -1,      1,       UNSPECF, // compass
+        0,       -1,      1,       1,       // vertical view
+        UNSPECF, UNSPECF, UNSPECF, UNSPECF, // projection
     };
     switch (display_mode)
     {
@@ -332,7 +361,7 @@ int window_size_update(void)
 
 
     glUseProgram(base_shader);
-    glUniformMatrix4fv(projection_loc, 1, GL_FALSE, projection);
+    glUniformMatrix4fv(projection_loc, 1, GL_FALSE, projection_f);
 
     float alt_w = width;
     switch (display_mode)
@@ -364,6 +393,14 @@ int window_size_update(void)
     CHECK_RES(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE);
 
 
+    glBindFramebuffer(GL_FRAMEBUFFER, proj_fb);
+    glBindTexture(GL_TEXTURE_2D, proj_tex);
+    // TODO coords
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width / 3, height / 3, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    CHECK_RES(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE);
+
+
     glBindFramebuffer(GL_FRAMEBUFFER, vertical_fb);
     glBindTexture(GL_TEXTURE_2D, vertical_tex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, alt_w, height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
@@ -382,6 +419,13 @@ int window_size_update(void)
     //m[5] = -1;
     //m[6] = 1;
     m[7] = -1 + 1 * (ratio < 1 ? ratio : 1);
+
+    // TODO
+    m[12] = -1/3.;
+    m[13] = -1;
+    m[14] = 1/3.;
+    m[15] = -1 + (2/3.);
+
     assert(glUnmapBuffer(GL_ARRAY_BUFFER));
 
     return 0;
@@ -400,7 +444,7 @@ void render_objects(FloatDArray os, GLuint VAO, GLuint VBO)
 {
     assert(os.l % 6 == 0);
 
-    glUniformMatrix4fv(view_loc, 1, GL_FALSE, view);
+    glUniformMatrix4fv(view_loc, 1, GL_FALSE, view_f);
 
     glBindVertexArray(VAO);
 
@@ -560,6 +604,34 @@ void render(void)
     glEnableVertexAttribArray(0);
     glDrawArrays(GL_LINES, 0, 2);
 
+    {
+        glViewport(0, 0, width / 3, height / 3); // TODO
+        glBindFramebuffer(GL_FRAMEBUFFER, proj_fb);
+        glClearColor(0, 0.5, 0, 1);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glUseProgram(proj_shader);
+
+        // TODO don't
+        GLint loc = -1;
+        loc = glGetUniformLocation(proj_shader, "view");
+        assert(loc != -1);
+        glUniformMatrix4fv(loc, 1, GL_FALSE, view_f);
+        PRINT_IF_GL_ERR("%d", loc);
+        loc = glGetUniformLocation(proj_shader, "projection");
+        assert(loc != -1);
+        glUniformMatrix4fv(loc, 1, GL_FALSE, projection_f);
+        PRINT_IF_GL_ERR("%d", loc);
+
+        glDisable(GL_DEPTH_TEST);
+        glLineWidth(3.0);
+        glBindVertexArray(proj_VAO);
+        glBindBuffer(GL_ARRAY_BUFFER, proj_VBO);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * proj_data.l, proj_data.p);
+        PRINT_IF_GL_ERR(" ");
+        glDrawArrays(GL_LINES, 0, proj_data.l / 3);
+        PRINT_IF_GL_ERR(" ");
+    }
+
     glEnable(GL_DEPTH_TEST);
 
     {
@@ -673,6 +745,9 @@ void render(void)
     default:
         assert(0);
     }
+    glBindTexture(GL_TEXTURE_2D, proj_tex);
+    glDrawArrays(GL_POINTS, 3, 1);
+
     glBindVertexArray(0);
 
 

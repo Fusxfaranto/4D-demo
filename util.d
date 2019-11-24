@@ -44,6 +44,15 @@ T inc_enum(T)(T x) if (is(T == enum) && is(typeof(cast(OriginalType!T)x + 1) : i
     return v.to!T;
 }
 
+bool contains(T)(const ref T[] a, const ref T e) pure {
+    foreach (ref ep; a) {
+        if (ep == e) {
+            return true;
+        }
+    }
+    return false;
+}
+
 
 
 string format(A...)(string fmt, A args)
@@ -139,7 +148,7 @@ void unsafe_assign(alias init, T)(ref T[] a) {
 }
 
 
-T reinterpret(T, U)(auto ref U u) if (T.sizeof) {
+T reinterpret(T, U)(auto ref U u) if (T.sizeof == U.sizeof) {
     return *cast(T*)(&u);
 }
 

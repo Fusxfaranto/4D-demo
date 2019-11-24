@@ -17,6 +17,7 @@ import movement;
 import shapes;
 import chunk;
 import cross_section;
+import projection;
 import world;
 import workers;
 
@@ -127,8 +128,8 @@ void main()
 
     //view_mat = look_at(camera_pos, Vec3(0, 0, 0), Vec3(0, 1, 0));
     view_mat = Mat4.init;
-    view = view_mat.data;
-    projection = projection_mat.data;
+    view_f = view_mat.data;
+    projection_f = projection_mat.data;
 
     compass_projection = compass_projection_mat.data;
 
@@ -278,10 +279,22 @@ void main()
         compass = compass_.data();
         debug(prof) profile_checkpoint();
 
+        {
+            Mat4 proj_cam = Mat4(
+                pd.right.x, pd.right.y, pd.right.z, pd.right.w,
+                pd.up.x, pd.up.y, pd.up.z, pd.up.w,
+                pd.front.x, pd.front.y, pd.front.z, pd.front.w,
+                pd.normal.x, pd.normal.y, pd.normal.z, pd.normal.w,
+                ).inverse();
+            gen_projection(proj_data, w, pd.pos, 2, 2, proj_cam);
+            //writeln(proj_data);
+            debug(prof) profile_checkpoint();
+        }
+
         w.sync_assign_chunk_gl_data();
 
         //assert(0);
-        float render_radius = 56;
+        float render_radius = 50;
         float render_height = render_radius * 0.6;
         int chunk_radius = cast(int)(render_radius / CHUNK_SIZE) + 2;
         int chunk_height = cast(int)(render_height / CHUNK_SIZE) + 2;
