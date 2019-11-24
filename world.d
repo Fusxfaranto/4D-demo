@@ -27,7 +27,7 @@ struct LoadParams {
 shared Locked!LoadParams load_params;
 
 
-ChunkPosStack cps_to_load = ChunkPosStack(1024 * 32);
+shared ChunkPosQueue cps_to_load = ChunkPosQueue(1024 * 32);
 
 
 class World
@@ -135,6 +135,7 @@ class World
         return cp in loaded_chunks;
     }
 
+    // TODO split this into 1 thread for queueing chunks and n for actually loading them
     void load_chunks(LoadParams params)
     {
         static load_count = 0;
@@ -220,6 +221,7 @@ class World
                 if (in_vert_sph(new_cp - center_cp, params.chunk_radius, params.chunk_height) && new_cp !in loaded_chunks) {
                     if (!cps_to_load.push(new_cp)) {
                         // TODO when cps_to_load is full (which is often), this can result in chunks never getting loaded (without further movement)
+                        assert(0);
                         break;
                     }
                 }
@@ -255,7 +257,7 @@ class World
         assert(readable_tid() == 0); // TODO
 
         ChunkPos cp;
-        while (assign_chunk_gl_data_stack.pop(cp)) {
+        while (assign_chunk_gl_data_queue.pop(cp)) {
             auto c = cp in loaded_chunks;
             c.sync_assign_chunk_gl_data();
         }

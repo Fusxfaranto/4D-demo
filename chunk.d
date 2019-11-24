@@ -203,8 +203,8 @@ enum ChunkDataState {
 }
 
 
-alias ChunkPosStack = LockFreeStack!ChunkPos;
-shared ChunkPosStack assign_chunk_gl_data_stack = ChunkPosStack(4096);
+alias ChunkPosQueue = Queue!ChunkPos;
+shared ChunkPosQueue assign_chunk_gl_data_queue = ChunkPosQueue(4096);
 
 struct Chunk
 {
@@ -628,7 +628,7 @@ struct Chunk
         }
 
         awaiting_gl_write = true;
-        bool res = assign_chunk_gl_data_stack.push(loc);
+        bool res = assign_chunk_gl_data_queue.push(loc);
         assert(res); // TODO
 
         dwritef!"chunk"("async gl data %s, num %s", loc, vert_data.length / 8);

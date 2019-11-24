@@ -12,73 +12,59 @@ import util;
 shared bool do_close = false;
 
 
-// TODO use casWeak?
-shared struct LockFreeStack(T) {
-    struct S {
-        T t;
-        int next = -1;
-    }
+shared struct Queue(T) {
+    private T[] storage;
+    private int begin = 0;
+    private int end = 0;
 
-    private S[] storage;
-    private int first = int.min;
-    private int length_ = 0;
+    private SpinLockUntracked sl;
 
     this(int n) {
-        storage = new S[n];
+        storage = new T[n];
+    }
+
+    private int incm(int i) {
+        return cast(int)((i + 1) % storage.length);
     }
 
     bool push(T t) {
-        // TODO randomize? start from first + 1?
-        int i;
-        for (i = 0; i < storage.length; i++) {
-            bool cas_succeed = cas(&storage[i].next, -1, 0);
-            if (cas_succeed) {
-                break;
-            }
-        }
-        if (i == storage.length) {
+        auto l = sl();
+
+        if (begin == incm(end)) {
             return false;
         }
 
-        atomicFetchAdd(length_, 1);
-        storage[i].t = t;
-
-        bool cas_succeed;
-        do {
-            int old_first = atomicLoad(first);
-            storage[i].next = old_first;
-            cas_succeed = cas(&first, old_first, i);
-        } while (!cas_succeed);
+        storage[end] = t;
+        end = incm(end);
 
         return true;
     }
 
     bool pop(ref T t) {
-        int old_first;
-        bool cas_succeed;
-        do {
-            old_first = atomicLoad(first);
-            if (old_first == int.min) {
-                return false;
-            }
-            int next = atomicLoad(storage[old_first].next);
-            cas_succeed = cas(&first, old_first, next);
-        } while (!cas_succeed);
+        auto l = sl();
 
-        atomicFetchSub(length_, 1);
-        t = storage[old_first].t;
+        if (begin == end) {
+            return false;
+        }
 
-        atomicStore(storage[old_first].next, -1);
+        t = storage[begin];
+        begin = incm(begin);
 
         return true;
     }
 
-    int length() const pure {
-        return atomicLoad(length_);
+    int length() {
+        auto l = sl();
+        int len = end - begin;
+        if (len < 0) {
+            len += storage.length;
+        }
+        return len;
     }
 
-    bool empty() const pure {
-        return atomicLoad(first) == int.min;
+    bool empty() {
+        auto l = sl();
+        return begin == end;
     }
 }
 
@@ -86,30 +72,29 @@ shared struct LockFreeStack(T) {
 
 unittest {
     enum N = 4;
-    LockFreeStack!int s = LockFreeStack!int(N);
+    Queue!int q = Queue!int(N + 1);
 
     for (int iter = 0; iter < 2; iter++) {
-        assert(s.storage.length == N);
-        assert(s.first == int.min);
-        assert(s.empty());
+        assert(q.storage.length == N + 1);
+        assert(q.empty());
         int r = -1;
         for (int i = 0; i < N; i++) {
-            //writefln("%s %s %s", s.length(), i, s.first);
-            assert(s.length() == i);
-            assert(s.push(i));
-            assert(s.first == i);
-            assert(!s.empty());
+            //writefln("%s %s", q.length(), i);
+            assert(q.length() == i);
+            assert(q.push(i));
+            assert(!q.empty());
         }
-        assert(!s.push(-1));
-        for (int i = N - 1; i >= 0; i--) {
-            assert(!s.empty());
-            assert(s.pop(r));
+        assert(!q.push(-1));
+        for (int i = 0; i < N; i++) {
+            assert(!q.empty());
+            assert(q.pop(r));
             assert(r == i);
-            assert(s.length() == i);
+            assert(q.length() == N - 1 - i);
         }
 
-        assert(!s.pop(r));
-        assert(s.empty());
+        assert(!q.pop(r));
+        assert(q.length() == 0);
+        assert(q.empty());
     }
 }
 

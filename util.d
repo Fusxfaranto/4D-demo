@@ -146,16 +146,22 @@ T reinterpret(T, U)(auto ref U u) if (T.sizeof) {
 enum MAX_NUM_THREADS = 6;
 shared (SpinLock*)[MAX_NUM_THREADS] sl_tracker;
 
-shared struct SpinLock {
+alias SpinLock = SpinLockBase!true;
+alias SpinLockUntracked = SpinLockBase!false;
+shared struct SpinLockBase(bool trackable) {
+    alias ThisSpinLock = typeof(this);
+
     private struct Locker {
-        SpinLock* l;
+        ThisSpinLock* l;
         ~this() {
             if (l) {
                 //dwritef!"lock"("unlock: %s", &l.is_locked);
                 l.assert_locked();
                 atomicStore(l.locking_thread_id, 0);
-                assert(atomicLoad(sl_tracker[readable_tid()]) == l);
-                atomicStore(sl_tracker[readable_tid()], null);
+                static if (trackable) {
+                    assert(atomicLoad(sl_tracker[readable_tid()]) == l);
+                    atomicStore(sl_tracker[readable_tid()], null);
+                }
                 atomicStore(l.is_locked, false);
             }
         }
@@ -189,8 +195,10 @@ shared struct SpinLock {
             spinning = true;
         }
         atomicStore(locking_thread_id, tid);
-        assert(atomicLoad(sl_tracker[readable_tid()]) is null);
-        atomicStore(sl_tracker[readable_tid()], &this);
+        static if (trackable) {
+            assert(atomicLoad(sl_tracker[readable_tid()]) is null);
+            atomicStore(sl_tracker[readable_tid()], &this);
+        }
         //dwritef!"lock"("lock succeess: %s", &is_locked);
         return Locker(&this);
     }
