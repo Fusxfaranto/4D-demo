@@ -60,6 +60,8 @@ extern (C) extern __gshared float* view_f;
 extern (C) extern __gshared float* projection_f;
 extern (C) extern __gshared float* compass_projection;
 extern (C) extern __gshared float[] proj_data;
+extern (C) extern __gshared float* proj_view;
+extern (C) extern __gshared float* proj_projection;
 extern (C) extern __gshared bool ui_hidden;
 
 struct screen_text_data_t

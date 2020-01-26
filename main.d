@@ -41,6 +41,7 @@ PosDir pd = PosDir(
     );
 
 Mat4 view_mat, projection_mat, compass_projection_mat;
+Mat4 proj_view_mat, proj_projection_mat;
 
 bool char_enabled = false;
 bool force_window_size_update = true;
@@ -131,6 +132,10 @@ void main()
     view_f = view_mat.data;
     projection_f = projection_mat.data;
 
+    proj_view_mat = Mat4.init;
+    proj_view = proj_view_mat.data;
+    proj_projection = proj_projection_mat.data;
+
     compass_projection = compass_projection_mat.data;
 
     handle_errors!init();
@@ -176,6 +181,10 @@ void main()
         {
             fov = deg_to_rad(45);
             float r = cast(float)(width) / height;
+
+            //proj_projection_mat = orthographic(-1, 1, -1 / r, 1 / r, -10, 10);
+            proj_projection_mat = perspective(fov * 2, r, 0.01, 100);
+
             final switch (display_mode.to!DisplayMode)
             {
             case DisplayMode.NORMAL:
@@ -189,6 +198,8 @@ void main()
             projection_mat = perspective(fov, r, 0.1, 1000);
             compass_projection_mat = perspective(deg_to_rad(45), width, 0.1, 1000);
             //projection_mat = orthographic(-width / 400.0, width / 400.0, -height / 400.0, height / 400.0, -10, 100);
+
+
             last_height = height;
             last_width = width;
             //last_fov = fov;
@@ -279,18 +290,6 @@ void main()
         compass = compass_.data();
         debug(prof) profile_checkpoint();
 
-        {
-            Mat4 proj_cam = Mat4(
-                pd.right.x, pd.right.y, pd.right.z, pd.right.w,
-                pd.up.x, pd.up.y, pd.up.z, pd.up.w,
-                pd.front.x, pd.front.y, pd.front.z, pd.front.w,
-                pd.normal.x, pd.normal.y, pd.normal.z, pd.normal.w,
-                ).inverse();
-            gen_projection(proj_data, w, pd.pos, 2, 2, proj_cam);
-            //writeln(proj_data);
-            debug(prof) profile_checkpoint();
-        }
-
         w.sync_assign_chunk_gl_data();
 
         //assert(0);
@@ -359,6 +358,21 @@ void main()
             }
         }
         debug(prof) profile_checkpoint();
+
+
+        {
+            Mat4 proj_cam = Mat4(
+                pd.right.x, pd.right.y, pd.right.z, pd.right.w,
+                pd.up.x, pd.up.y, pd.up.z, pd.up.w,
+                pd.front.x, pd.front.y, pd.front.z, pd.front.w,
+                pd.normal.x, pd.normal.y, pd.normal.z, pd.normal.w,
+                ).inverse();
+            enum R = 3;
+            gen_projection(proj_data, w, pd.pos, R, R, targeted_block, proj_cam);
+            //writeln(proj_data);
+            debug(prof) profile_checkpoint();
+        }
+
 
         final switch (display_mode.to!DisplayMode)
         {
@@ -510,6 +524,11 @@ extern (C) void key_callback(GLFWwindow* window, int key, int scancode, int acti
 
     case GLFWKey.GLFW_KEY_BACKSPACE: {
         ui_hidden ^= true;
+        break;
+    }
+
+    case GLFWKey.GLFW_KEY_P: {
+        proj_type ^= true;
         break;
     }
 

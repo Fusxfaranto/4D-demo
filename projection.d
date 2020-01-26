@@ -1,5 +1,5 @@
+import std.algorithm : clamp, sort;
 import std.math : PI, abs, sin, cos, tan, sqrt, acos, isNaN;
-
 import std.range : back, empty;
 
 import chunk;
@@ -65,15 +65,21 @@ immutable Vec4[16] block_verts = [
     ];
 
 
-//enum float aspect_ratio = 1;
-enum float fov = deg_to_rad(45);
-enum float tan_half_fov = tan(fov / 2);
 
-enum float near_w = 0.1;
-enum float far_w = 3;
+bool proj_type = false;
 
 
-void gen_block_projection(ref float[] verts_out, BlockType t, BlockPos bp, Vec4 center, const ref Mat4 rot) {
+bool vert_in_targeted_cell(int vert_idx, int targeted_cell) {
+    if (targeted_cell <= -1) {
+        return false;
+    }
+    assert(targeted_cell <= Vec4BasisSigned.max);
+
+    return !!(targeted_cell >= 4) ^ !!(vert_idx & (1 << (3 - (targeted_cell & 3))));
+}
+
+
+void gen_block_projection(ref float[6][2][] edges_out, BlockType t, BlockPos bp, Vec4 center, int targeted_cell, const ref Mat4 rot) {
     final switch (t) {
     case BlockType.NONE:
         return;
@@ -84,32 +90,105 @@ void gen_block_projection(ref float[] verts_out, BlockType t, BlockPos bp, Vec4 
 
     Vec4 rel_pos = bp.to_vec4() - center;
 
-    // TODO missing camera angle?
+
+    //enum float aspect_ratio = 1;
+    enum float fov = deg_to_rad(45);
+    enum float tan_half_fov = tan(fov / 2);
+
+    enum float near_w = 0.1;
+    enum float far_w = 3;
 
     Vec3[16] proj_verts;
+    Vec4[16] rel_verts;
     for (int i = 0; i < 16; i++) {
-        Vec4 rel_vert = rot * (block_verts[i] + rel_pos);
-        proj_verts[i] = Vec3(
-            rel_vert.x / tan_half_fov - rel_vert.w,
-            rel_vert.y / tan_half_fov - rel_vert.w,
-            rel_vert.z / tan_half_fov - rel_vert.w,
-            );
+        rel_verts[i] = rot * (block_verts[i] + rel_pos);
+        Vec4 rel_vert = rel_verts[i];
+        if (proj_type) {
+            proj_verts[i] = Vec3(
+                //rel_vert.x / tan_half_fov - rel_vert.w,
+                //rel_vert.y / tan_half_fov - rel_vert.w,
+                //rel_vert.z / tan_half_fov - rel_vert.w,
+                // TODO ???
+                rel_vert.x / (tan_half_fov * -rel_vert.w),
+                rel_vert.y / (tan_half_fov * -rel_vert.w),
+                rel_vert.z / (tan_half_fov * -rel_vert.w),
+                );
+        } else {
+            proj_verts[i] = Vec3(
+                rel_vert.x,
+                rel_vert.y,
+                rel_vert.z,
+                );
+        }
+        // TODO ??
+        //proj_verts[i] = (1/4.) * proj_verts[i];
+    }
+
+    bool all_hidden = true;
+    for (int i = 0; i < 16; i++) {
+        if (dot_p(rel_verts[i], Vec4(0, 0, -1, 0)) > 0) {
+            all_hidden = false;
+            break;
+        }
+    }
+    if (all_hidden) {
+        return;
     }
 
     // TODO culling?
     foreach (ref edge; block_edges) {
+        bool is_targeted = vert_in_targeted_cell(edge[0], targeted_cell) && vert_in_targeted_cell(edge[1], targeted_cell);
+
+        edges_out ~= (float[6][2]).init;
+
         foreach (i; 0..2) {
-            verts_out ~= proj_verts[edge[i]].x;
-            verts_out ~= proj_verts[edge[i]].y;
-            verts_out ~= proj_verts[edge[i]].z;
+            edges_out[$ - 1][i][0] = proj_verts[edge[i]].x;
+            edges_out[$ - 1][i][1] = proj_verts[edge[i]].y;
+            edges_out[$ - 1][i][2] = proj_verts[edge[i]].z;
+
+            if (is_targeted) {
+                // TODO hack
+                edges_out[$ - 1][i][2] += 0.01;
+
+                edges_out[$ - 1][i][3] = 1.0;
+                edges_out[$ - 1][i][4] = 1.0;
+                edges_out[$ - 1][i][5] = 0.3;
+            } else {
+                float c;
+                //c = clamp(1.0 - 1.0 * sigmoid(rel_verts[edge[i]].magnitude()), 0.0, 1.0);
+                //c = clamp(1.0 - 1.1 * sigmoid(rel_verts[edge[i]].magnitude()), 0.0, 1.0);
+                c = 2 * clamp(1.4 * sigmoid(rel_verts[edge[i]].w) - 0.2, 0.0, 1.0) - 1.0;
+
+                // TODO why did i do this??
+                if (abs(c) <= 1e-5) {
+                    // verts_out.unsafe_popback();
+                    // verts_out.unsafe_popback();
+                    // verts_out.unsafe_popback();
+                    // continue;
+                }
+
+                bool red_side = rel_verts[edge[i]].w > 0;
+                if (red_side) {
+                    edges_out[$ - 1][i][3] = 1 - c * c;
+                    edges_out[$ - 1][i][4] = 1 - abs(c);
+                } else {
+                    edges_out[$ - 1][i][3] = 1 - abs(c);
+                    edges_out[$ - 1][i][4] = 1 - c * c;
+                }
+                edges_out[$ - 1][i][5] = 1 - c * c;
+            }
         }
     }
 }
 
 
-void gen_projection(ref float[] verts_out, ref World w, Vec4 center, float radius, float height, const ref Mat4 rot) {
-    verts_out.unsafe_reset();
+private bool edge_sort(const ref float[6][2] a, const ref float[6][2] b) {
+    Vec3 midpoint_a = 0.5 * (reinterpret!(Vec3, float[3])(a[0][0..3]) + reinterpret!(Vec3, float[3])(a[1][0..3]));
+    Vec3 midpoint_b = 0.5 * (reinterpret!(Vec3, float[3])(b[0][0..3]) + reinterpret!(Vec3, float[3])(b[1][0..3]));
+    return midpoint_a.magnitude() > midpoint_b.magnitude();
+}
 
+void gen_projection(ref float[] verts_out, ref World w, Vec4 center, float radius, float height, BlockFace targeted, const ref Mat4 rot) {
     BlockPos center_bp = BlockPos(center);
 
     static BlockPos[] bp_stack;
@@ -154,7 +233,32 @@ void gen_projection(ref float[] verts_out, ref World w, Vec4 center, float radiu
         }
     }
 
+    static float[6][2][] edges;
+    edges.unsafe_reset();
+
+    bool will_render_targeted = false;
     foreach (ref bp; to_process) {
-        gen_block_projection(verts_out, w.get_block(bp), bp, center, rot);
+        if (targeted.pos == bp) {
+            // TODO i don't think we want to do this
+            if (false) {
+                will_render_targeted = true;
+            } else {
+                gen_block_projection(edges, w.get_block(targeted.pos), targeted.pos, center, targeted.face, rot);
+            }
+            continue;
+        }
+        gen_block_projection(edges, w.get_block(bp), bp, center, -1, rot);
+    }
+
+    if (will_render_targeted) {
+        // ensure targeted is drawn above others
+        gen_block_projection(edges, w.get_block(targeted.pos), targeted.pos, center, targeted.face, rot);
+    }
+
+    if (edges.length > 0) {
+        sort!edge_sort(edges);
+        verts_out = (&edges[0][0][0])[0..(edges.length * 2 * 6)];
+    } else {
+        verts_out = null;
     }
 }

@@ -17,10 +17,10 @@ out vec3 color_f;
 void main()
 {
     vec4[2] view_pos;
-    view_pos[0] = gl_in[0].gl_Position;
-    view_pos[1] = gl_in[1].gl_Position;
+    view_pos[0] = view * gl_in[0].gl_Position;
+    view_pos[1] = view * gl_in[1].gl_Position;
 
-    float width = 0.04;
+    float width = 0.013;
     vec4 shift = vec4(width * normalize(cross(
         vec3(0, 0, 1),
         (view_pos[0] - view_pos[1]).xyz

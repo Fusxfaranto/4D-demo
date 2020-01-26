@@ -7,6 +7,7 @@ import core.atomic : atomicLoad, atomicStore, cas;
 import core.sync.mutex : Mutex;
 import std.datetime.stopwatch : StopWatch;
 import std.datetime : to, TickDuration;
+import std.math : exp;
 import std.process : thisThreadID;
 import std.traits : OriginalType, isIntegral;
 
@@ -30,6 +31,10 @@ T div_floor(T)(T x, T y) if (isIntegral!T) {
     int r = x % y;
     if ((r != 0) && ((r < 0) != (y < 0))) q--;
     return q;
+}
+
+T sigmoid(T)(T a) {
+    return 1.0 / (1.0 + exp(-a));
 }
 
 
@@ -126,18 +131,21 @@ void swap(T)(ref T a, ref T b)
 }
 
 
-void unsafe_reset(T)(ref T[] a) {
+void unsafe_set_length(T)(ref T[] a, size_t n) {
     auto c = a.capacity;
-    a.length = 0;
+    a.length = n;
     a.assumeSafeAppend();
-    assert(a.capacity == c, c.to!string() ~ " " ~ a.capacity.to!string());
+    if (c >= n) {
+        assert(a.capacity == c, c.to!string() ~ " " ~ a.capacity.to!string());
+    }
+}
+
+void unsafe_reset(T)(ref T[] a) {
+    unsafe_set_length(a, 0);
 }
 
 void unsafe_popback(T)(ref T[] a) {
-    auto c = a.capacity;
-    a.length = a.length - 1;
-    a.assumeSafeAppend();
-    assert(a.capacity == c, c.to!string() ~ " " ~ a.capacity.to!string());
+    unsafe_set_length(a, a.length - 1);
 }
 
 void unsafe_assign(alias init, T)(ref T[] a) {

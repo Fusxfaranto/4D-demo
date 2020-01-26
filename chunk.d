@@ -796,6 +796,8 @@ struct ChunkIndex {
     }
 
     LockedChunkP opBinaryRight(string s : "in")(auto ref ChunkPos cp) {
+        assert(cp != ChunkPos.INVALID);
+
         Chunk* c = index(cp);
         //dwritef!"lock"("attempting to lock %s (%s)", c, cp);
         auto l = c.lock();
@@ -820,6 +822,8 @@ struct ChunkIndex {
 
     // TODO this is gross, implement move semantics or something
     LockedChunkP fetch()(auto ref ChunkPos cp) {
+        assert(cp != ChunkPos.INVALID);
+
         Chunk* old_c = index(cp);
         //dwritef!"chunk"("fetching %s (%s)", old_c, cp);
         auto l = old_c.lock();

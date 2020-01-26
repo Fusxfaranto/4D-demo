@@ -74,6 +74,8 @@ GLuint proj_VBO;
 GLuint proj_fb;
 GLuint proj_tex;
 FloatDArray proj_data;
+float *proj_view, *proj_projection;
+GLuint proj_depth_rbo;
 
 
 typedef struct ChunkGLData {
@@ -204,7 +206,7 @@ int init(void)
     CHECK_RES(create_shader(&base_shader, "vertex.glsl", NULL, "fragment.glsl"));
     CHECK_RES(create_shader(&compass_shader, "compass_vertex.glsl", NULL, "compass_fragment.glsl"));
     CHECK_RES(create_shader(&cuboid_shader, "block_vertex.glsl", "block_geometry.glsl", "block_fragment.glsl"));
-    CHECK_RES(create_shader(&proj_shader, "proj_vertex.glsl", NULL, "proj_fragment.glsl"));
+    CHECK_RES(create_shader(&proj_shader, "proj_vertex.glsl", "proj_geometry.glsl", "proj_fragment.glsl"));
     CHECK_RES(create_shader(&fb_shader, "fb_vertex.glsl", "fb_geometry.glsl", "fb_fragment.glsl"));
 
     view_loc = glGetUniformLocation(base_shader, "view");
@@ -242,9 +244,11 @@ int init(void)
     glBindVertexArray(proj_VAO);
     glBindBuffer(GL_ARRAY_BUFFER, proj_VBO);
     // TODO size
-    glBufferData(GL_ARRAY_BUFFER, (4096 * 8) * sizeof(float), NULL, GL_STREAM_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (GLvoid*)0);
+    glBufferData(GL_ARRAY_BUFFER, (4096 * 64) * sizeof(float), NULL, GL_STREAM_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)0);
     glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
+    glEnableVertexAttribArray(1);
 
 
     glGenBuffers(1, &compass_VBO);
@@ -310,6 +314,10 @@ int init(void)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glBindTexture(GL_TEXTURE_2D, 0);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, proj_tex, 0);
+    glGenRenderbuffers(1, &proj_depth_rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, proj_depth_rbo);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, proj_depth_rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 
@@ -396,8 +404,11 @@ int window_size_update(void)
     glBindFramebuffer(GL_FRAMEBUFFER, proj_fb);
     glBindTexture(GL_TEXTURE_2D, proj_tex);
     // TODO coords
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width / 3, height / 3, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    glBindTexture(GL_TEXTURE_2D, 0);
+    float proj_w = width / 3, proj_h = height / 3;
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, proj_w, proj_h, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glBindRenderbuffer(GL_RENDERBUFFER, proj_depth_rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, proj_w, proj_h);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
     CHECK_RES(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE);
 
 
@@ -605,31 +616,36 @@ void render(void)
     glDrawArrays(GL_LINES, 0, 2);
 
     {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        //glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
         glViewport(0, 0, width / 3, height / 3); // TODO
         glBindFramebuffer(GL_FRAMEBUFFER, proj_fb);
-        glClearColor(0, 0.5, 0, 1);
+        glClearColor(0, 0, 0, 1);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glUseProgram(proj_shader);
+        //glEnable(GL_DEPTH_TEST);
+        glDisable(GL_DEPTH_TEST);
 
-        // TODO don't
         GLint loc = -1;
         loc = glGetUniformLocation(proj_shader, "view");
         assert(loc != -1);
-        glUniformMatrix4fv(loc, 1, GL_FALSE, view_f);
+        glUniformMatrix4fv(loc, 1, GL_FALSE, proj_view);
         PRINT_IF_GL_ERR("%d", loc);
         loc = glGetUniformLocation(proj_shader, "projection");
         assert(loc != -1);
-        glUniformMatrix4fv(loc, 1, GL_FALSE, projection_f);
+        glUniformMatrix4fv(loc, 1, GL_FALSE, proj_projection);
         PRINT_IF_GL_ERR("%d", loc);
 
-        glDisable(GL_DEPTH_TEST);
-        glLineWidth(3.0);
         glBindVertexArray(proj_VAO);
         glBindBuffer(GL_ARRAY_BUFFER, proj_VBO);
         glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(float) * proj_data.l, proj_data.p);
         PRINT_IF_GL_ERR(" ");
-        glDrawArrays(GL_LINES, 0, proj_data.l / 3);
+        glDrawArrays(GL_LINES, 0, proj_data.l / 6);
         PRINT_IF_GL_ERR(" ");
+
+        glDisable(GL_BLEND);
     }
 
     glEnable(GL_DEPTH_TEST);
