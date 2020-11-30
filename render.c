@@ -68,6 +68,7 @@ GLuint compass_shader;
 GLuint compass_fb;
 GLuint compass_tex;
 
+bool proj_enabled = 0;
 GLuint proj_shader;
 GLuint proj_VAO;
 GLuint proj_VBO;
@@ -400,17 +401,17 @@ int window_size_update(void)
     glBindTexture(GL_TEXTURE_2D, 0);
     CHECK_RES(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE);
 
-
-    glBindFramebuffer(GL_FRAMEBUFFER, proj_fb);
-    glBindTexture(GL_TEXTURE_2D, proj_tex);
-    // TODO coords
-    float proj_w = width / 3, proj_h = height / 3;
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, proj_w, proj_h, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    glBindRenderbuffer(GL_RENDERBUFFER, proj_depth_rbo);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, proj_w, proj_h);
-    glBindRenderbuffer(GL_RENDERBUFFER, 0);
-    CHECK_RES(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE);
-
+    if (proj_enabled) {
+        glBindFramebuffer(GL_FRAMEBUFFER, proj_fb);
+        glBindTexture(GL_TEXTURE_2D, proj_tex);
+        // TODO coords
+        float proj_w = width / 3, proj_h = height / 3;
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, proj_w, proj_h, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+        glBindRenderbuffer(GL_RENDERBUFFER, proj_depth_rbo);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, proj_w, proj_h);
+        glBindRenderbuffer(GL_RENDERBUFFER, 0);
+        CHECK_RES(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE);
+    }
 
     glBindFramebuffer(GL_FRAMEBUFFER, vertical_fb);
     glBindTexture(GL_TEXTURE_2D, vertical_tex);
@@ -615,6 +616,7 @@ void render(void)
     glEnableVertexAttribArray(0);
     glDrawArrays(GL_LINES, 0, 2);
 
+    if (proj_enabled)
     {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -761,9 +763,11 @@ void render(void)
     default:
         assert(0);
     }
-    glBindTexture(GL_TEXTURE_2D, proj_tex);
-    glDrawArrays(GL_POINTS, 3, 1);
 
+    if (proj_enabled) {
+        glBindTexture(GL_TEXTURE_2D, proj_tex);
+        glDrawArrays(GL_POINTS, 3, 1);
+    }
     glBindVertexArray(0);
 
 

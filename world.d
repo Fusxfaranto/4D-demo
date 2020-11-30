@@ -25,6 +25,9 @@ struct LoadParams {
     int chunk_height;
 }
 shared Locked!LoadParams load_params;
+bool params_loaded(in ref LoadParams params) {
+    return !(params.chunk_radius == 0 || params.chunk_height == 0);
+}
 
 
 shared ChunkPosQueue cps_to_load = ChunkPosQueue(1024 * 32);
@@ -138,6 +141,11 @@ class World
     // TODO split this into 1 thread for queueing chunks and n for actually loading them
     void load_chunks(LoadParams params)
     {
+        if (!params_loaded(params)) {
+            dwritef("load params unintialized, waiting for main thread");
+            return;
+        }
+
         static load_count = 0;
         dwritef!"chunk"("load count %s", load_count);
 
@@ -197,6 +205,7 @@ class World
 
             newly_loaded ~= cp;
             //loaded_chunks.set(fetch_chunk(cp));
+            dwritef!"chunk"("fetching at dist %s", vert_sph_sdf(cp - center_cp, params.chunk_radius, params.chunk_height));
             loaded_chunks.fetch(cp);
             load_count++;
             //writeln("loaded ", cp);

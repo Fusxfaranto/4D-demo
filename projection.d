@@ -66,7 +66,7 @@ immutable Vec4[16] block_verts = [
 
 
 
-bool proj_type = false;
+bool proj_type = true;
 
 
 bool vert_in_targeted_cell(int vert_idx, int targeted_cell) {
@@ -78,6 +78,21 @@ bool vert_in_targeted_cell(int vert_idx, int targeted_cell) {
     return !!(targeted_cell >= 4) ^ !!(vert_idx & (1 << (3 - (targeted_cell & 3))));
 }
 
+
+/*
+
+  the core bug here:
+  this is using the regular camera (which points towards z)
+  for the 4d -> 3d projection, and then is projecting that in
+  the z direction from 3d -> 2d, which doesn't actually make
+  sense.
+
+  the solution:
+  for the 4d -> 3d projection, the camera needs to be facing
+  the normal direction, which should be as simple as a 90 degree
+  rotation to `rot`
+
+ */
 
 void gen_block_projection(ref float[6][2][] edges_out, BlockType t, BlockPos bp, Vec4 center, int targeted_cell, const ref Mat4 rot) {
     final switch (t) {
@@ -104,24 +119,26 @@ void gen_block_projection(ref float[6][2][] edges_out, BlockType t, BlockPos bp,
         rel_verts[i] = rot * (block_verts[i] + rel_pos);
         Vec4 rel_vert = rel_verts[i];
         if (proj_type) {
+            float adj_w;
+            if (rel_vert.w > 0) {
+                adj_w = rel_vert.w + 1;
+            } else {
+                adj_w = -rel_vert.w + 1;
+            }
+            float scale = 1 / (tan_half_fov * adj_w);
             proj_verts[i] = Vec3(
-                //rel_vert.x / tan_half_fov - rel_vert.w,
-                //rel_vert.y / tan_half_fov - rel_vert.w,
-                //rel_vert.z / tan_half_fov - rel_vert.w,
-                // TODO ???
-                rel_vert.x / (tan_half_fov * -rel_vert.w),
-                rel_vert.y / (tan_half_fov * -rel_vert.w),
-                rel_vert.z / (tan_half_fov * -rel_vert.w),
+                rel_vert.x * scale,
+                rel_vert.y * scale,
+                rel_vert.z * scale,
                 );
         } else {
+            float scale = 3;
             proj_verts[i] = Vec3(
-                rel_vert.x,
-                rel_vert.y,
-                rel_vert.z,
+                rel_vert.x * scale,
+                rel_vert.y * scale,
+                rel_vert.z * scale,
                 );
         }
-        // TODO ??
-        //proj_verts[i] = (1/4.) * proj_verts[i];
     }
 
     bool all_hidden = true;
@@ -137,6 +154,11 @@ void gen_block_projection(ref float[6][2][] edges_out, BlockType t, BlockPos bp,
 
     // TODO culling?
     foreach (ref edge; block_edges) {
+        if (rel_verts[edge[0]].w <= 0 ||
+            rel_verts[edge[1]].w <= 0) {
+            continue;
+        }
+
         bool is_targeted = vert_in_targeted_cell(edge[0], targeted_cell) && vert_in_targeted_cell(edge[1], targeted_cell);
 
         edges_out ~= (float[6][2]).init;
@@ -153,6 +175,12 @@ void gen_block_projection(ref float[6][2][] edges_out, BlockType t, BlockPos bp,
                 edges_out[$ - 1][i][3] = 1.0;
                 edges_out[$ - 1][i][4] = 1.0;
                 edges_out[$ - 1][i][5] = 0.3;
+
+                Vec4 avg_rel_vert = Vec4(0, 0, 0, 0);
+                for (int j = 0; j < 16; j++) {
+                    avg_rel_vert += rel_verts[j];
+                }
+                writeln(avg_rel_vert * (1 / 16.));
             } else {
                 float c;
                 //c = clamp(1.0 - 1.0 * sigmoid(rel_verts[edge[i]].magnitude()), 0.0, 1.0);

@@ -163,6 +163,7 @@ T reinterpret(T, U)(auto ref U u) if (T.sizeof == U.sizeof) {
 enum MAX_NUM_THREADS = 6;
 shared (SpinLock*)[MAX_NUM_THREADS] sl_tracker;
 
+// TODO should probably make this not a spinlock
 alias SpinLock = SpinLockBase!true;
 alias SpinLockUntracked = SpinLockBase!false;
 shared struct SpinLockBase(bool trackable) {
@@ -251,6 +252,7 @@ shared struct SpinLockBase(bool trackable) {
     }
 }
 
+// TODO this only works for POD, doesn't it?
 shared struct Locked(T) {
     SpinLock lock;
     T t;

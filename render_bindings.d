@@ -59,6 +59,7 @@ extern (C) extern __gshared float[] vertical_objects;
 extern (C) extern __gshared float* view_f;
 extern (C) extern __gshared float* projection_f;
 extern (C) extern __gshared float* compass_projection;
+extern (C) extern __gshared bool proj_enabled;
 extern (C) extern __gshared float[] proj_data;
 extern (C) extern __gshared float* proj_view;
 extern (C) extern __gshared float* proj_projection;

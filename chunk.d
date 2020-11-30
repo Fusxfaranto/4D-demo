@@ -1,4 +1,4 @@
-import std.algorithm : min;
+import std.algorithm : max, min;
 import std.range : back;
 import std.array : empty;
 import std.conv : to;
@@ -126,6 +126,22 @@ struct IPos(size_t N)
 
 float distance(T)(auto ref in T a, auto ref in T b) if (is(T : IPos!Np, size_t Np)) {
     return sqrt(to!double((a.x - b.x) ^^ 2 + (a.y - b.y) ^^ 2 + (a.z - b.z) ^^ 2 + (a.w - b.w) ^^ 2));
+}
+
+double vert_sph_sdf(T)(auto ref in T a, double radius, double height) {
+    double sph_part = sqrt(to!double(a.x ^^ 2 + a.z ^^ 2 + a.w ^^ 2)) - radius;
+    double h_part = abs(a.y) - height;
+    bool sph_pos = sph_part > 0;
+    bool h_pos = h_part > 0;
+    if (!sph_pos && !h_pos) {
+        return max(sph_part, h_part);
+    } else if (!sph_pos) {
+        return h_part;
+    } else if (!h_pos) {
+        return sph_part;
+    } else {
+        return sqrt(sph_part ^^ 2 + h_part ^^ 2);
+    }
 }
 
 bool in_vert_sph(T)(auto ref in T a, double radius, double height) {
@@ -464,6 +480,7 @@ struct Chunk
             {
                 if (state_grid.data[i] == BlockState.UNFILLED)
                 {
+                    // TODO this conditional looks pointless??
                     if (first_unfilled == -1) {
                         first_unfilled = i;
                         break;
@@ -825,7 +842,7 @@ struct ChunkIndex {
         assert(cp != ChunkPos.INVALID);
 
         Chunk* old_c = index(cp);
-        //dwritef!"chunk"("fetching %s (%s)", old_c, cp);
+        dwritef!"chunk"("fetching %s", cp);
         auto l = old_c.lock();
 
         if (old_c.state != ChunkDataState.INVALID && old_c.loc == cp) {
@@ -834,7 +851,10 @@ struct ChunkIndex {
         }
 
         // TODO this leaks overwritten chunks (gl data etc)
-        assert(old_c.state == ChunkDataState.INVALID);
+        if (old_c.state != ChunkDataState.INVALID) {
+            dwritef("fetching %s (old %s, new %s)", old_c, old_c.loc, cp);
+            assert(0);
+        }
 
         fetch_chunk(*old_c, cp);
         return LockedChunkP(old_c, l);

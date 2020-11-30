@@ -360,7 +360,7 @@ void main()
         debug(prof) profile_checkpoint();
 
 
-        {
+        if (proj_enabled) {
             Mat4 proj_cam = Mat4(
                 pd.right.x, pd.right.y, pd.right.z, pd.right.w,
                 pd.up.x, pd.up.y, pd.up.z, pd.up.w,
